@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "vnr-wlr"
+description = "Vernier backend for wlr-output-management compositors (niri, sway, Hyprland) with COSMIC extensions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+vnr-core.workspace = true
+wayland-client.workspace = true
+wayland-protocols-wlr.workspace = true
+wayland-scanner.workspace = true
+
+[lints]
+workspace = true

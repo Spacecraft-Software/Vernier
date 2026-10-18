@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "vnr-backends"
+description = "Run-time backend detection for Vernier"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+vnr-core.workspace = true
+vnr-kde.workspace = true
+vnr-mutter.workspace = true
+vnr-wlr.workspace = true
+vnr-x11.workspace = true
+
+[lints]
+workspace = true
