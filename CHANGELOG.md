@@ -16,9 +16,14 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
   agent or CI; `jsonl`, `yaml`, `csv`, `--fields` and `--print0`; single-line
   JSON errors with runnable hints and documented exit codes 0–5 and 10–16;
   `--dry-run` for every change and file write; argument and path validation.
+- `--fields` accepts any field a record declares, even when this answer
+  omits it as null.
 - `fixture` backend (`VNR_FIXTURE`) for testing without a display server.
 - `vnr-theme` crate shared by the CLI and the editor.
 - `SKILL.md` describing `vnr` for AI agents.
 - iced editor with drag-and-snap, properties panel, problem list, Steelbore
   theme, and confirm-or-revert after apply.
-- Stub crates for the X11, KDE and GNOME backends.
+- X11 backend over `RandR` 1.3+ (pure-Rust `x11rb` connection): outputs,
+  modes, EDID identity, position, mode, rotation and reflection, mirroring,
+  primary output, screen resizing, all applied with the server grabbed.
+- Stub crates for the KDE and GNOME backends.

@@ -17,6 +17,10 @@ categories.workspace = true
 
 [dependencies]
 vnr-core.workspace = true
+x11rb.workspace = true
+
+[dev-dependencies]
+x11rb.workspace = true
 
 [lints]
 workspace = true

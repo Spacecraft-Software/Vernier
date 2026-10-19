@@ -398,13 +398,13 @@ impl Out {
     ///
     /// Returns an error when `--fields` names an unknown field or the
     /// payload cannot be serialized.
-    pub fn emit<T: Serialize>(
+    pub fn emit<T: Serialize + JsonSchema>(
         &self,
         data: &T,
         human: impl FnOnce(&Self) -> String,
     ) -> Result<(), AppError> {
         let value = serde_json::to_value(data).map_err(internal)?;
-        let value = self.select_fields(value)?;
+        let value = self.select_fields(value, &record_fields::<T>())?;
         let mut stdout = io::stdout().lock();
         let text = match self.mode() {
             _ if self.print0 => print0(&value),
@@ -459,50 +459,37 @@ impl Out {
             .map_err(internal)
     }
 
-    /// Applies `--fields` to a record or a list of records.
-    fn select_fields(&self, value: Value) -> Result<Value, AppError> {
+    /// Applies `--fields` to a record or a list of records. `known` is
+    /// every field the record type declares, so an optional field that is
+    /// absent from this particular answer is still accepted.
+    fn select_fields(&self, value: Value, known: &[String]) -> Result<Value, AppError> {
         let Some(fields) = &self.fields else {
             return Ok(value);
         };
-        let keep = |record: Map<String, Value>| -> Map<String, Value> {
-            fields
-                .iter()
-                .filter_map(|f| record.get(f).map(|v| (f.clone(), v.clone())))
-                .collect()
-        };
-        let known = |record: &Map<String, Value>, field: &str| record.contains_key(field);
-        match value {
-            Value::Array(items) => {
-                let records: Vec<Map<String, Value>> = items
-                    .into_iter()
-                    .filter_map(|item| match item {
-                        Value::Object(map) => Some(map),
-                        _ => None,
-                    })
-                    .collect();
-                // A field is valid if any record has it; optional fields are
-                // omitted when null, so not every record carries every key.
-                if let Some(unknown) = fields
-                    .iter()
-                    .find(|f| !records.is_empty() && !records.iter().any(|r| known(r, f)))
-                {
-                    return Err(unknown_field(unknown, &self.command));
-                }
-                Ok(Value::Array(
-                    records
-                        .into_iter()
-                        .map(|r| Value::Object(keep(r)))
-                        .collect(),
-                ))
-            }
-            Value::Object(map) => {
-                if let Some(unknown) = fields.iter().find(|f| !known(&map, f)) {
-                    return Err(unknown_field(unknown, &self.command));
-                }
-                Ok(Value::Object(keep(map)))
-            }
-            other => Ok(other),
+        if let Some(unknown) = fields.iter().find(|f| !known.contains(f)) {
+            return Err(unknown_field(unknown, &self.command));
         }
+        let keep = |record: Map<String, Value>| -> Value {
+            Value::Object(
+                fields
+                    .iter()
+                    .filter_map(|f| record.get(f).map(|v| (f.clone(), v.clone())))
+                    .collect(),
+            )
+        };
+        Ok(match value {
+            Value::Array(items) => Value::Array(
+                items
+                    .into_iter()
+                    .map(|item| match item {
+                        Value::Object(map) => keep(map),
+                        other => other,
+                    })
+                    .collect(),
+            ),
+            Value::Object(map) => keep(map),
+            other => other,
+        })
     }
 
     /// Reports an error in the current mode and returns its exit code.
@@ -517,6 +504,29 @@ impl Out {
         );
         error.exit_code
     }
+}
+
+/// The property names a record type declares, looking through a list to
+/// its item type.
+fn record_fields<T: JsonSchema>() -> Vec<String> {
+    let schema = serde_json::to_value(schemars::schema_for!(T)).unwrap_or_default();
+    let record = match schema
+        .get("items")
+        .and_then(|i| i.get("$ref"))
+        .and_then(Value::as_str)
+    {
+        Some(reference) => reference
+            .strip_prefix("#/$defs/")
+            .and_then(|name| schema.get("$defs").and_then(|d| d.get(name)))
+            .cloned()
+            .unwrap_or_default(),
+        None => schema.get("items").cloned().unwrap_or(schema),
+    };
+    record
+        .get("properties")
+        .and_then(Value::as_object)
+        .map(|p| p.keys().cloned().collect())
+        .unwrap_or_default()
 }
 
 fn unknown_field(field: &str, command: &str) -> AppError {

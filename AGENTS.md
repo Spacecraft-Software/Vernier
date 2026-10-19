@@ -16,7 +16,8 @@ and ARandR (X11). Spacecraft Software project; maintainer Mohamed Hammad.
 |---|---|
 | `crates/vnr-core` | Model, geometry, validation, profiles, exporters, `Backend` trait. No I/O. |
 | `crates/vnr-wlr` | wlr-output-management v4 + COSMIC extension (vendored XML in `protocols/`). |
-| `crates/vnr-kde`, `vnr-mutter`, `vnr-x11` | Backend stubs; see PLAN.md M2–M4. |
+| `crates/vnr-x11` | X11 `RandR` through `x11rb`'s pure-Rust connection. `state.rs` holds the pure snapshot/plan logic. |
+| `crates/vnr-kde`, `vnr-mutter` | Backend stubs; see PLAN.md M3–M4. |
 | `crates/vnr-backends` | Run-time detection, `open()`, and the `fixture` backend (`VNR_FIXTURE=<file.json>`). |
 | `crates/vnr-theme` | Steelbore tokens and §11.6 theme resolution, shared by CLI colors and the editor. `assets/steelbore.toml` is the canonical palette, never edited by hand. |
 | `crates/vnr-gui` | iced editor. |
@@ -34,7 +35,13 @@ cargo run -p vnr -- gui --demo        # editor on a sample layout, no display ch
 CLI tests (`crates/vnr/tests/cli.rs`) run the real binary against the fixture
 backend, so they need no display server. Headless end-to-end testing: run
 sway with `WLR_BACKENDS=headless`, add outputs with `swaymsg create_output`,
-then point `WAYLAND_DISPLAY` at it.
+then point `WAYLAND_DISPLAY` at it. The X11 backend has a real-server test
+using the Xorg dummy driver (16 virtual outputs with genuine CRTCs):
+
+```nushell
+Xorg :5 -noreset -nolisten tcp -config crates/vnr-x11/tests/dummy.conf
+VNR_X11_TEST_DISPLAY=:5 cargo test -p vnr-x11 -- --include-ignored
+```
 
 ## CLI invariants (Spacecraft CLI Standard v1.1)
 

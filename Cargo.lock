@@ -3910,6 +3910,7 @@ name = "vnr-x11"
 version = "0.1.0"
 dependencies = [
  "vnr-core",
+ "x11rb",
 ]
 
 [[package]]

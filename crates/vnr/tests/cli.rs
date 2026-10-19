@@ -244,6 +244,22 @@ fn fields_restricts_and_rejects_unknown_fields() {
         serde_json::json!({"name": "DP-1", "scale": 1.0})
     );
 
+    // An optional field absent from this answer is still a known field.
+    let unchanged = sandbox.run(&[
+        "output",
+        "set",
+        "DP-1",
+        "--scale",
+        "1",
+        "--fields",
+        "outcome,accepted_by_backend",
+    ]);
+    assert_eq!(unchanged.code, 0, "{}", unchanged.stderr);
+    assert_eq!(
+        unchanged.json()["data"],
+        serde_json::json!({"outcome": "unchanged"})
+    );
+
     let bad = sandbox.run(&["output", "list", "--fields", "nonsense"]);
     assert_eq!(bad.code, 2);
     assert_eq!(bad.error()["code"], "INVALID_ARGUMENT");
