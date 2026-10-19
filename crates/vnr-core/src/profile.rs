@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The TOML profile format written by `vnr save` and read by `vnr apply`.
+//! The TOML profile format written by `vnr profile save` and read by `vnr profile apply`.
 //!
 //! ```toml
 //! [[output]]

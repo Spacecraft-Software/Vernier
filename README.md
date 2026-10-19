@@ -6,7 +6,8 @@ Vernier (`vnr`) arranges, rotates, scales and mirrors displays. It replaces
 program: a graphical editor and a scriptable command line built on the same
 backends.
 
-Conforms to The Steelbore Standard v2.12 — Category C, tailored (see
+Conforms to The Steelbore Standard v2.13 — Category C, tailored — and the
+Spacecraft Software CLI Standard v1.1 (see
 [Tailoring register](#tailoring-register)).
 
 ## Status
@@ -31,33 +32,50 @@ Pre-release (0.1.0). Milestone progress is tracked in [`PLAN.md`](PLAN.md).
   configuration before Vernier applies it.
 - **No text scraping.** Vernier speaks the display protocols directly, so mode
   names such as `1080p` cannot break it the way they broke ARandR.
-- **Profiles you can read.** `vnr save` writes TOML; entries match a monitor by
+- **Profiles you can read.** `vnr profile save` writes TOML; entries match a monitor by
   make, model and serial, so a profile survives the monitor moving to another
   port.
 - **Permanent where the compositor forgets.** Changes over wlr-output-management
-  are lost when niri or sway restarts. `vnr export --format niri` (or `sway`)
+  are lost when niri or sway restarts. `vnr layout export --to niri` (or `sway`)
   prints the config block that makes them permanent.
 - **Mirroring on COSMIC**, through COSMIC's own protocol extension.
 
 ## Usage
 
+Commands follow `vnr <noun> <verb>`:
+
 ```nushell
-vnr                                  # open the editor
-vnr gui --demo                       # try the editor on a sample layout
-vnr list                             # outputs, modes and settings
-vnr list --json | from json          # the same, as a Nushell table
-vnr backend                          # which backend, and what it can do
-vnr set DP-1 --mode 2560x1440@144 --right-of eDP-1 --scale 1.25
-vnr set HDMI-A-1 --mirror eDP-1      # COSMIC only
-vnr set eDP-1 --off --test           # ask the compositor without changing anything
-vnr save ~/.config/vernier/desk.toml
-vnr apply ~/.config/vernier/desk.toml --yes
-vnr export --format niri | save -f ~/.config/niri/outputs.kdl
+vnr                                       # open the editor
+vnr gui --demo                            # try the editor on a sample layout
+vnr output list                           # outputs, modes and settings
+vnr output list --json | from json | get data   # the same, as a Nushell table
+vnr output get DP-1 --fields name,mode,scale
+vnr backend get                           # which backend, and what it can do
+vnr output set DP-1 --mode 2560x1440@144 --right-of eDP-1 --scale 1.25
+vnr output set HDMI-A-1 --mirror eDP-1    # COSMIC only
+vnr output set eDP-1 --off --dry-run      # plan it and ask the compositor; change nothing
+vnr profile save ~/.config/vernier/desk.toml
+vnr profile apply ~/.config/vernier/desk.toml --yes
+vnr layout export --to niri --write ~/.config/niri/vernier.kdl
 ```
 
-`--backend` (or `VNR_BACKEND`) forces `wlr`, `cosmic`, `kde`, `mutter` or `x11`.
-Changes made on a terminal prompt for confirmation; scripts and non-terminal
-runs keep the change, and `--yes` skips the prompt.
+On a terminal `vnr` prints tables and asks before keeping a change. Piped, or
+when `AI_AGENT`, `AGENT` or `CI` is set, it prints one JSON document
+`{"metadata": …, "data": …}` on stdout and never prompts; diagnostics and
+errors go to stderr, errors as one JSON line with a `hint` holding the command
+to run next. `--format jsonl|yaml|csv`, `--fields` and `--print0` shape the
+output, `--dry-run` previews any change or file write, and `--yes` keeps a
+change or overwrites a file without asking.
+
+`vnr schema` prints every command's JSON Schema (ready for LLM function
+calling) and `vnr describe` the capability manifest. Exit codes: 0 success,
+2 usage, 3 not found, 4 path not allowed, 5 conflict, 10 backend unavailable,
+11 unsupported, 12 rejected by the compositor, 13 protocol error, 14 reverted,
+15 invalid layout, 16 revert failed.
+
+`--backend` (or `VNR_BACKEND`) forces `wlr`, `cosmic`, `kde`, `mutter` or
+`x11`. File arguments must lie in the working directory or Vernier's XDG
+directories; `VNR_ALLOWED_PATHS` adds more.
 
 ### Editor keys
 
@@ -133,6 +151,8 @@ yet met, with the reason and the milestone that closes it.
 | 2026-10-18 | §10 | Key bindings are not yet user-remappable | Bindings are fixed in code until the config file lands | M6 |
 | 2026-10-18 | §8 | No Texinfo manual | Interface still changing before 1.0 | M7 |
 | 2026-10-18 | §5.5 | Only the Nix package exists; Guix and PKGBUILD are missing | Pre-release, no tag pushed | M7 |
+| 2026-10-19 | CLI §2 Rule 1 | `--format explore` prints the table instead of an interactive viewer | ratatui viewer not built yet (TODO T-017) | M6 |
+| 2026-10-19 | CLI testing | No cross-shell round-trip tests (Nushell, PowerShell, jaq) | Needs those shells in CI (TODO T-018) | M7 |
 | 2026-10-18 | §20 | Requirements live as `PLAN.md` items, not an `AGENTS.md` requirement list | Scope still being settled | M7 |
 
 ## License

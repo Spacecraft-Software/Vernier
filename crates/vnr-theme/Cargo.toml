@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "vnr-theme"
+description = "Steelbore theme tokens and resolution (Steelbore Standard §11.6, §18.1) for Vernier"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+toml.workspace = true
+
+[lints]
+workspace = true

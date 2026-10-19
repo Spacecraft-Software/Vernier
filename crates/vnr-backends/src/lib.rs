@@ -12,6 +12,9 @@
 //!    `XDG_CURRENT_DESKTOP`.
 //! 3. X11 session (`DISPLAY` set, no `WAYLAND_DISPLAY`): `RandR`.
 //!
+//! When `VNR_FIXTURE` names a file, the fixture backend wins over all of
+//! these, so tests never touch a real display.
+//!
 //! # Examples
 //!
 //! ```no_run
@@ -25,12 +28,17 @@
 
 // Rust guideline compliant 2026-05-18
 
+mod fixture;
+
 use std::env;
 
 use vnr_core::{Backend, BackendError, BackendKind};
 
+#[doc(inline)]
+pub use fixture::{FIXTURE_ENV, Fixture, FixtureBackend};
+
 /// Environment variable that forces a backend (`wlr`, `cosmic`, `kde`,
-/// `mutter`, `x11`), equivalent to `vnr --backend`.
+/// `mutter`, `x11`, `fixture`), equivalent to `vnr --backend`.
 pub const BACKEND_ENV: &str = "VNR_BACKEND";
 
 /// Opens a backend: `forced` if given, otherwise the detected one.
@@ -63,6 +71,7 @@ fn open_kind(kind: BackendKind) -> Result<Box<dyn Backend>, BackendError> {
         BackendKind::Kde => Ok(Box::new(vnr_kde::KdeBackend::connect()?)),
         BackendKind::Mutter => Ok(Box::new(vnr_mutter::MutterBackend::connect()?)),
         BackendKind::X11 => Ok(Box::new(vnr_x11::X11Backend::connect()?)),
+        BackendKind::Fixture => Ok(Box::new(FixtureBackend::connect()?)),
     }
 }
 
@@ -70,7 +79,7 @@ fn detect_and_open() -> Result<Box<dyn Backend>, BackendError> {
     let session = Session::from_env();
     match session.candidates().as_slice() {
         [] => Err(BackendError::unavailable(
-            "no graphical session: neither WAYLAND_DISPLAY nor DISPLAY is set",
+            "no graphical session: neither `WAYLAND_DISPLAY` nor `DISPLAY` is set",
         )),
         candidates => {
             let mut last_error = None;
@@ -89,6 +98,7 @@ fn detect_and_open() -> Result<Box<dyn Backend>, BackendError> {
 /// The parts of the environment detection looks at.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct Session {
+    fixture: bool,
     wayland: bool,
     x11: bool,
     desktop: String,
@@ -98,6 +108,7 @@ impl Session {
     fn from_env() -> Self {
         let set = |name| env::var_os(name).is_some_and(|v| !v.is_empty());
         Self {
+            fixture: set(FIXTURE_ENV),
             wayland: set("WAYLAND_DISPLAY"),
             x11: set("DISPLAY"),
             desktop: env::var("XDG_CURRENT_DESKTOP")
@@ -110,6 +121,10 @@ impl Session {
     fn candidates(&self) -> Vec<BackendKind> {
         let desktop_has = |name: &str| self.desktop.split(':').any(|d| d == name);
         let mut kinds = Vec::new();
+        if self.fixture {
+            kinds.push(BackendKind::Fixture);
+            return kinds;
+        }
         if self.wayland {
             kinds.push(BackendKind::Wlr);
             if desktop_has("kde") {
@@ -135,6 +150,7 @@ mod tests {
             wayland: true,
             x11: true,
             desktop: "kde".into(),
+            ..Session::default()
         };
         assert_eq!(session.candidates(), [BackendKind::Wlr, BackendKind::Kde]);
         let gnome = Session {
@@ -152,5 +168,15 @@ mod tests {
         };
         assert_eq!(session.candidates(), [BackendKind::X11]);
         assert!(Session::default().candidates().is_empty());
+    }
+
+    #[test]
+    fn fixture_wins_over_sessions() {
+        let session = Session {
+            fixture: true,
+            wayland: true,
+            ..Session::default()
+        };
+        assert_eq!(session.candidates(), [BackendKind::Fixture]);
     }
 }

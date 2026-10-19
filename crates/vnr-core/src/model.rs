@@ -615,11 +615,22 @@ pub enum BackendKind {
     Mutter,
     /// X11 `RandR`.
     X11,
+    /// A JSON file standing in for a display server, named by `VNR_FIXTURE`.
+    /// Used by tests and demonstrations; never chosen by detection unless
+    /// that variable is set.
+    Fixture,
 }
 
 impl BackendKind {
     /// Every backend, in detection order.
-    pub const ALL: [Self; 5] = [Self::Cosmic, Self::Wlr, Self::Kde, Self::Mutter, Self::X11];
+    pub const ALL: [Self; 6] = [
+        Self::Fixture,
+        Self::Cosmic,
+        Self::Wlr,
+        Self::Kde,
+        Self::Mutter,
+        Self::X11,
+    ];
 
     /// The identifier used by `--backend` and `VNR_BACKEND`.
     #[must_use]
@@ -630,6 +641,7 @@ impl BackendKind {
             Self::Kde => "kde",
             Self::Mutter => "mutter",
             Self::X11 => "x11",
+            Self::Fixture => "fixture",
         }
     }
 }
@@ -656,7 +668,7 @@ impl FromStr for BackendKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[expect(
     clippy::struct_excessive_bools,
-    reason = "independent capability flags, serialized as-is for `vnr backend --json`"
+    reason = "independent capability flags, serialized as-is for `vnr backend get --json`"
 )]
 pub struct Capabilities {
     /// Can make one output mirror another.

@@ -369,7 +369,7 @@ impl App {
                     self.status = if self.caps.persistent || self.options.demo {
                         "Kept.".to_owned()
                     } else {
-                        "Kept until the compositor restarts. Run `vnr export` to make it permanent."
+                        "Kept until the compositor restarts. Run `vnr layout export --to niri --write` to make it permanent."
                             .to_owned()
                     };
                 }

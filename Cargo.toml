@@ -9,6 +9,7 @@ members = [
     "crates/vnr-kde",
     "crates/vnr-mutter",
     "crates/vnr-x11",
+    "crates/vnr-theme",
     "crates/vnr-backends",
     "crates/vnr-gui",
     "crates/vnr",
@@ -34,16 +35,27 @@ vnr-mutter = { path = "crates/vnr-mutter", version = "0.1.0" }
 vnr-x11 = { path = "crates/vnr-x11", version = "0.1.0" }
 vnr-backends = { path = "crates/vnr-backends", version = "0.1.0" }
 vnr-gui = { path = "crates/vnr-gui", version = "0.1.0" }
+vnr-theme = { path = "crates/vnr-theme", version = "0.1.0" }
 
 anyhow = "1.0.104"
+csv = "1.4.0"
+jiff = "0.2.38"
+schemars = "1.2.3"
+serde_norway = "0.9.42"
 clap = { version = "4.6.7", features = ["derive", "env"] }
 iced = { version = "0.14.0", features = ["canvas", "tokio"] }
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
+serde_json = { version = "1.0.154", features = ["preserve_order"] }
 toml = "1.1.8"
 wayland-client = "0.31.15"
 wayland-protocols-wlr = { version = "0.3.12", features = ["client"] }
 wayland-scanner = "0.31"
+
+# Test-only.
+assert_cmd = "2.2.2"
+jsonschema = { version = "0.59.0", default-features = false }
+predicates = "3.1.4"
+tempfile = "3.27.0"
 
 [workspace.lints.rust]
 ambiguous_negative_literals = "warn"

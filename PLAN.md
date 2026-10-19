@@ -23,6 +23,7 @@ MVP: M0–M7 — Vernier v1.0
 - [ ] P-014 Verify on niri (real hardware)
 - [ ] P-015 Verify on COSMIC (real hardware), including mirroring
 - [ ] P-016 Live change tracking (re-read state on compositor `done` events)
+- [ ] P-036 CLI Standard v1.1 conformance (see TODO.md)
 
 ## M2 — X11 backend
 

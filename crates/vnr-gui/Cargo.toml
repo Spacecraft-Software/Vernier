@@ -19,7 +19,7 @@ categories.workspace = true
 anyhow.workspace = true
 iced.workspace = true
 serde.workspace = true
-toml.workspace = true
+vnr-theme.workspace = true
 vnr-backends.workspace = true
 vnr-core.workspace = true
 

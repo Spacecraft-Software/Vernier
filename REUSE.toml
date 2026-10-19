@@ -11,6 +11,6 @@ SPDX-FileCopyrightText = "2024 Victoria Brekenfeld"
 SPDX-License-Identifier = "MIT"
 
 [[annotations]]
-path = "crates/vnr-gui/assets/steelbore.toml"
+path = "crates/vnr-theme/assets/steelbore.toml"
 SPDX-FileCopyrightText = "2026 Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>"
 SPDX-License-Identifier = "GPL-3.0-or-later"

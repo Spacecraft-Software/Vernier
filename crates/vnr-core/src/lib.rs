@@ -12,7 +12,7 @@
 //! - [`model`]: outputs, modes, transforms, scale, mirroring.
 //! - [`geometry`]: logical rectangles, edge snapping, normalization.
 //! - [`validate()`]: problems a layout has before it is sent anywhere.
-//! - [`Profile`]: the TOML profile format used by `vnr save` / `vnr apply`.
+//! - [`Profile`]: the TOML profile format used by `vnr profile save` / `vnr profile apply`.
 //! - [`export`]: niri and sway configuration snippets.
 //! - [`Backend`]: the trait every backend crate implements.
 //!

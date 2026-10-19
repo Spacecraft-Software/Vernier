@@ -21,6 +21,8 @@ vnr-kde.workspace = true
 vnr-mutter.workspace = true
 vnr-wlr.workspace = true
 vnr-x11.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true
