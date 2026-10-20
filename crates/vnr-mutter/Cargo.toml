@@ -17,6 +17,7 @@ categories.workspace = true
 
 [dependencies]
 vnr-core.workspace = true
+zbus.workspace = true
 
 [lints]
 workspace = true

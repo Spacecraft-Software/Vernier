@@ -82,15 +82,19 @@ fn detect_and_open() -> Result<Box<dyn Backend>, BackendError> {
             "no graphical session: neither `WAYLAND_DISPLAY` nor `DISPLAY` is set",
         )),
         candidates => {
-            let mut last_error = None;
+            // Report the first candidate's reason: it is the desktop's own
+            // backend, or wlr, and so the most telling.
+            let mut first_error = None;
             for kind in candidates {
                 match open_kind(*kind) {
                     Ok(backend) => return Ok(backend),
-                    Err(e) if e.is_unavailable() => last_error = Some(e),
+                    Err(e) if e.is_unavailable() => {
+                        first_error.get_or_insert(e);
+                    }
                     Err(e) => return Err(e),
                 }
             }
-            Err(last_error.unwrap_or_else(|| BackendError::unavailable("no backend matched")))
+            Err(first_error.unwrap_or_else(|| BackendError::unavailable("no backend matched")))
         }
     }
 }
@@ -126,17 +130,18 @@ impl Session {
             return kinds;
         }
         if self.wayland {
-            // The desktop's own protocol first, then wlr, then KWin's, which
-            // answers "unavailable" quickly on other compositors.
+            // The desktop's own protocol first, then wlr, KWin's and Mutter's,
+            // each of which answers "unavailable" quickly elsewhere.
             if desktop_has("kde") {
                 kinds.push(BackendKind::Kde);
             }
             if desktop_has("gnome") {
                 kinds.push(BackendKind::Mutter);
             }
-            kinds.push(BackendKind::Wlr);
-            if !kinds.contains(&BackendKind::Kde) {
-                kinds.push(BackendKind::Kde);
+            for kind in [BackendKind::Wlr, BackendKind::Kde, BackendKind::Mutter] {
+                if !kinds.contains(&kind) {
+                    kinds.push(kind);
+                }
             }
         } else if self.x11 {
             kinds.push(BackendKind::X11);
@@ -157,7 +162,10 @@ mod tests {
             desktop: "kde".into(),
             ..Session::default()
         };
-        assert_eq!(session.candidates(), [BackendKind::Kde, BackendKind::Wlr]);
+        assert_eq!(
+            session.candidates(),
+            [BackendKind::Kde, BackendKind::Wlr, BackendKind::Mutter]
+        );
         let gnome = Session {
             desktop: "ubuntu:gnome".into(),
             ..session.clone()
@@ -170,7 +178,10 @@ mod tests {
             desktop: "niri".into(),
             ..session
         };
-        assert_eq!(unknown.candidates(), [BackendKind::Wlr, BackendKind::Kde]);
+        assert_eq!(
+            unknown.candidates(),
+            [BackendKind::Wlr, BackendKind::Kde, BackendKind::Mutter]
+        );
     }
 
     #[test]
