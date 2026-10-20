@@ -17,6 +17,8 @@ categories.workspace = true
 
 [dependencies]
 vnr-core.workspace = true
+wayland-client.workspace = true
+wayland-protocols-plasma.workspace = true
 
 [lints]
 workspace = true

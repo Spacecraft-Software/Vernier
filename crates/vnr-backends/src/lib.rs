@@ -126,12 +126,17 @@ impl Session {
             return kinds;
         }
         if self.wayland {
-            kinds.push(BackendKind::Wlr);
+            // The desktop's own protocol first, then wlr, then KWin's, which
+            // answers "unavailable" quickly on other compositors.
             if desktop_has("kde") {
                 kinds.push(BackendKind::Kde);
             }
             if desktop_has("gnome") {
                 kinds.push(BackendKind::Mutter);
+            }
+            kinds.push(BackendKind::Wlr);
+            if !kinds.contains(&BackendKind::Kde) {
+                kinds.push(BackendKind::Kde);
             }
         } else if self.x11 {
             kinds.push(BackendKind::X11);
@@ -152,12 +157,20 @@ mod tests {
             desktop: "kde".into(),
             ..Session::default()
         };
-        assert_eq!(session.candidates(), [BackendKind::Wlr, BackendKind::Kde]);
+        assert_eq!(session.candidates(), [BackendKind::Kde, BackendKind::Wlr]);
         let gnome = Session {
             desktop: "ubuntu:gnome".into(),
+            ..session.clone()
+        };
+        assert_eq!(
+            gnome.candidates(),
+            [BackendKind::Mutter, BackendKind::Wlr, BackendKind::Kde]
+        );
+        let unknown = Session {
+            desktop: "niri".into(),
             ..session
         };
-        assert_eq!(gnome.candidates(), [BackendKind::Wlr, BackendKind::Mutter]);
+        assert_eq!(unknown.candidates(), [BackendKind::Wlr, BackendKind::Kde]);
     }
 
     #[test]

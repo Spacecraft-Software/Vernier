@@ -404,7 +404,11 @@ impl Out {
         human: impl FnOnce(&Self) -> String,
     ) -> Result<(), AppError> {
         let value = serde_json::to_value(data).map_err(internal)?;
-        let value = self.select_fields(value, &record_fields::<T>())?;
+        let known = record_fields::<T>();
+        let value = self.select_fields(value, &known)?;
+        // CSV columns are the fields asked for, or every declared field, so
+        // the header does not change with which optional values are present.
+        let columns = self.fields.clone().unwrap_or(known);
         let mut stdout = io::stdout().lock();
         let text = match self.mode() {
             _ if self.print0 => print0(&value),
@@ -443,7 +447,7 @@ impl Out {
                     serde_json::to_value(self.metadata()).map_err(internal)?,
                 );
                 let _ = writeln!(io::stderr().lock(), "{}", Value::Object(wrapper));
-                csv(&value)?
+                csv(&value, &columns)?
             }
         };
         stdout
@@ -600,13 +604,13 @@ fn scalar(value: &Value) -> String {
 
 /// RFC 4180 CSV of a record or list of records; the header is the union
 /// of keys in first-seen order.
-fn csv(value: &Value) -> Result<String, AppError> {
+fn csv(value: &Value, columns: &[String]) -> Result<String, AppError> {
     let records: Vec<&Map<String, Value>> = match value {
         Value::Array(items) => items.iter().filter_map(Value::as_object).collect(),
         Value::Object(map) => vec![map],
         _ => Vec::new(),
     };
-    let mut header: Vec<&str> = Vec::new();
+    let mut header: Vec<&str> = columns.iter().map(String::as_str).collect();
     for record in &records {
         for key in record.keys() {
             if !header.contains(&key.as_str()) {
@@ -777,7 +781,7 @@ mod tests {
             {"name": "B", "primary": true}
         ]);
         assert_eq!(
-            csv(&value).unwrap(),
+            csv(&value, &[]).unwrap(),
             "name,modes,primary\nA,1x1;2x2,\nB,,true\n"
         );
     }
