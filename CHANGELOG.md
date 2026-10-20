@@ -26,4 +26,7 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 - X11 backend over `RandR` 1.3+ (pure-Rust `x11rb` connection): outputs,
   modes, EDID identity, position, mode, rotation and reflection, mirroring,
   primary output, screen resizing, all applied with the server grabbed.
+  Verified on real hardware (ThinkPad T490s, Intel modesetting driver).
+- `vnr output get` shows make, model and serial, and lists modes under
+  `available` so `mode` always means the current one.
 - Stub crates for the KDE and GNOME backends.

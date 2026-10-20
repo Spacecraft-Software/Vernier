@@ -29,11 +29,11 @@ MVP: M0–M7 — Vernier v1.0
 
 - [x] P-017 `RandR` 1.3+ snapshot via `x11rb`: outputs, CRTCs, modes, EDID identity
 - [x] P-018 Apply: CRTC config, screen resize, rotation, mirroring, primary
-- [ ] P-037 Scale via CRTC transform: verify on a driver with transforms (modesetting, amdgpu, i915); the dummy driver and Xvfb have none
+- [x] P-037 Scale via CRTC transform: verified on a ThinkPad T490s (Intel, modesetting), 2026-10-20
 - [ ] P-038 Custom modes (`RRCreateMode` from CVT timings)
 - [ ] P-019 `ScreenChangeNotify` live tracking
 - [ ] P-020 Run the Xorg dummy-driver integration test (`crates/vnr-x11/tests/xorg_dummy.rs`) in CI
-- [ ] P-039 Verify on real X11 hardware
+- [x] P-039 Verify on real X11 hardware: scale, rotation, revert and EDID identity on a ThinkPad T490s, 2026-10-20
 
 ## M3 — KDE Plasma backend
 

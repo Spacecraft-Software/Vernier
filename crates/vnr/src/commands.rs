@@ -204,6 +204,15 @@ fn output_get(out: &Out, kind: Option<BackendKind>, args: &GetArgs) -> Result<()
         };
         line("name", record.name.clone());
         line("label", output.label());
+        for (key, value) in [
+            ("make", &record.make),
+            ("model", &record.model),
+            ("serial", &record.serial),
+        ] {
+            if let Some(value) = value {
+                line(key, value.clone());
+            }
+        }
         line("enabled", record.enabled.to_string());
         if let Some(mode) = &record.mode {
             line("mode", mode.clone());
@@ -234,7 +243,9 @@ fn output_get(out: &Out, kind: Option<BackendKind>, args: &GetArgs) -> Result<()
             } else {
                 format!(" ({})", flags.join(", "))
             };
-            line("mode", format!("{mode}{suffix}"));
+            // `available`, not `mode`: one key per meaning keeps the text
+            // easy to grep and cut.
+            line("available", format!("{mode}{suffix}"));
         }
         text
     })

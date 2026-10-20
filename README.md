@@ -20,7 +20,7 @@ Pre-release (0.1.0). Milestone progress is tracked in [`PLAN.md`](PLAN.md).
 | `cosmic` | COSMIC (wlr + `zcosmic_output_manager_v1` v3) | Implemented; not yet tested on COSMIC |
 | `kde` | KDE Plasma (`kde-output-management-v2`) | Planned (M3) |
 | `mutter` | GNOME (`org.gnome.Mutter.DisplayConfig`) | Planned (M4) |
-| `x11` | Any X11 session (`RandR` 1.3+) | Working; tested against the Xorg dummy driver. Scaling and custom modes pending |
+| `x11` | Any X11 session (`RandR` 1.3+) | Working; tested against the Xorg dummy driver and on a ThinkPad T490s (Intel). Custom modes pending |
 
 ## What it does better than the originals
 
