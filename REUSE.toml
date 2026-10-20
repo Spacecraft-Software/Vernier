@@ -14,3 +14,8 @@ SPDX-License-Identifier = "MIT"
 path = "crates/vnr-theme/assets/steelbore.toml"
 SPDX-FileCopyrightText = "2026 Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>"
 SPDX-License-Identifier = "GPL-3.0-or-later"
+
+[[annotations]]
+path = "crates/vnr-kde/protocols/*.xml"
+SPDX-FileCopyrightText = "KDE contributors; see each file's copyright block"
+SPDX-License-Identifier = "MIT-CMU"

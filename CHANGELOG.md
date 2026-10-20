@@ -33,6 +33,10 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
   `kde_output_management_v2`: modes, position, rotation, fractional scale,
   VRR policy, and the primary output through output priorities. Plasma keeps
   applied changes across restarts. Tested against headless `KWin`.
+  The Plasma protocol XML is vendored and compiled in (MIT-CMU), so current
+  `KWin` versions, which send newer events, work; outputs announced through
+  `kde_output_device_registry_v2` are read; mirroring works from Plasma 6.3.
+- A missing `libwayland-client.so` is reported by name, with how to fix it.
 - Backend detection tries the desktop's own protocol first, then wlr,
   then KWin's.
 - CSV output always has the same columns, even when an optional value is

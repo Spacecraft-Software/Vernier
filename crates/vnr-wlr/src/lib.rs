@@ -85,8 +85,7 @@ impl WlrBackend {
     /// Returns [`BackendError::is_unavailable`] if there is no Wayland
     /// session or the compositor does not implement wlr-output-management.
     pub fn connect() -> Result<Self, BackendError> {
-        let conn = Connection::connect_to_env()
-            .map_err(|e| BackendError::unavailable(format!("no Wayland session: {e}")))?;
+        let conn = Connection::connect_to_env().map_err(|e| no_session(&e))?;
         let (globals, queue) = registry_queue_init::<State>(&conn)
             .map_err(|e| BackendError::protocol(format!("Wayland registry failed: {e}")))?;
         let qh = queue.handle();
@@ -769,6 +768,19 @@ impl Dispatch<ZcosmicOutputConfigurationHeadV1, ()> for State {
         _: &QueueHandle<Self>,
     ) {
         // The interface has no events.
+    }
+}
+
+/// Explains a failed Wayland connection. A missing `libwayland-client` is
+/// called out by name: the GUI toolkit makes the binary load it at run
+/// time, and builds outside a Nix environment cannot find it on NixOS.
+fn no_session(error: &wayland_client::ConnectError) -> BackendError {
+    match error {
+        wayland_client::ConnectError::NoWaylandLib => BackendError::unavailable(
+            "libwayland-client.so could not be loaded; install it, or on NixOS use the packaged \
+             build or put wayland's lib directory on LD_LIBRARY_PATH",
+        ),
+        other => BackendError::unavailable(format!("no Wayland session: {other}")),
     }
 }
 

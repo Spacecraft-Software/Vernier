@@ -16,9 +16,10 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
+bitflags.workspace = true
 vnr-core.workspace = true
 wayland-client.workspace = true
-wayland-protocols-plasma.workspace = true
+wayland-scanner.workspace = true
 
 [lints]
 workspace = true
