@@ -3878,9 +3878,10 @@ dependencies = [
 name = "vnr-kde"
 version = "0.1.0"
 dependencies = [
+ "bitflags 2.13.2",
  "vnr-core",
  "wayland-client",
- "wayland-protocols-plasma",
+ "wayland-scanner",
 ]
 
 [[package]]

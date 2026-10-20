@@ -3,26 +3,41 @@
 
 //! Vernier backend for KDE Plasma.
 //!
-//! `KWin` describes each output with its own `kde_output_device_v2` global
-//! and changes them through `kde_output_management_v2`; both come from
-//! `wayland-protocols-plasma`. The backend covers:
+//! `KWin` describes each output with a `kde_output_device_v2` object (a
+//! global per output, or announced by `kde_output_device_registry_v2` from
+//! version 21) and changes them through `kde_output_management_v2`. The
+//! protocol XML is vendored and compiled here (see [`protocol`]). The
+//! backend covers:
 //!
 //! - mode, position, rotation and reflection, and fractional scale;
 //! - the variable refresh rate policy (never, always, automatic) on outputs
 //!   that support it;
 //! - the primary output, which Plasma models as output priority 1
 //!   (`kde_output_order_v1` reports the order; management version 3 sets
-//!   it, version 2 falls back to `set_primary_output`).
+//!   it, version 2 falls back to `set_primary_output`);
+//! - mirroring, from management version 13 (`set_replication_source`).
 //!
 //! Plasma saves an applied configuration itself, so changes survive a
 //! restart ([`Capabilities::persistent`]). The management protocol has no
-//! test request, no custom modes and, in the versions this crate binds, no
-//! mirroring; those are refused before anything is sent.
+//! test request, and custom modes are not supported yet; those, and
+//! mirroring on `KWin` older than Plasma 6.3, are refused before anything is
+//! sent.
 
 // Rust guideline compliant 2026-10-20
 
 mod plan;
+mod protocol;
 
+use crate::protocol::output_device::{
+    kde_output_device_mode_v2::{self, KdeOutputDeviceModeV2},
+    kde_output_device_registry_v2::{self, KdeOutputDeviceRegistryV2},
+    kde_output_device_v2::{self, KdeOutputDeviceV2},
+};
+use crate::protocol::output_management::{
+    kde_output_configuration_v2::{self, KdeOutputConfigurationV2},
+    kde_output_management_v2::{self, KdeOutputManagementV2},
+};
+use crate::protocol::output_order::kde_output_order_v1::{self, KdeOutputOrderV1};
 use vnr_core::{
     AdaptiveSync, Backend, BackendError, BackendKind, Capabilities, Layout, Mode, Output, Position,
     Scale, Transform,
@@ -33,23 +48,17 @@ use wayland_client::protocol::wl_registry;
 use wayland_client::{
     Connection, Dispatch, EventQueue, Proxy, QueueHandle, WEnum, event_created_child,
 };
-use wayland_protocols_plasma::output_device::v2::client::{
-    kde_output_device_mode_v2::{self, KdeOutputDeviceModeV2},
-    kde_output_device_v2::{self, KdeOutputDeviceV2},
-};
-use wayland_protocols_plasma::output_management::v2::client::{
-    kde_output_configuration_v2::{self, KdeOutputConfigurationV2},
-    kde_output_management_v2::{self, KdeOutputManagementV2},
-};
-use wayland_protocols_plasma::output_order::v1::client::kde_output_order_v1::{
-    self, KdeOutputOrderV1,
-};
 
-/// Highest `kde_output_device_v2` version this backend binds.
-const DEVICE_MAX_VERSION: u32 = 11;
+/// Highest `kde_output_device_v2` (and registry) version this backend binds:
+/// the vendored XML's.
+const DEVICE_MAX_VERSION: u32 = 26;
+/// The registry refuses binds below this version.
+const REGISTRY_MIN_VERSION: u32 = 21;
 /// Highest `kde_output_management_v2` version this backend binds; version 3
-/// adds output priorities, version 12 failure reasons.
-const MANAGEMENT_MAX_VERSION: u32 = 12;
+/// adds output priorities, 12 failure reasons, 13 mirroring.
+const MANAGEMENT_MAX_VERSION: u32 = 22;
+/// First management version with `set_replication_source`.
+const MANAGEMENT_MIRRORING: u32 = 13;
 /// Capability bit for a variable refresh rate (`kde_output_device_v2`).
 const CAPABILITY_VRR: u32 = 0x2;
 
@@ -81,8 +90,7 @@ impl KdeBackend {
     /// As [`KdeBackend::connect`].
     pub fn connect_to(display: Option<&str>) -> Result<Self, BackendError> {
         let conn = match display {
-            None => Connection::connect_to_env()
-                .map_err(|e| BackendError::unavailable(format!("no Wayland session: {e}")))?,
+            None => Connection::connect_to_env().map_err(|e| no_session(&e))?,
             Some(name) => {
                 let path = std::path::Path::new(name);
                 let path = if path.is_absolute() {
@@ -96,8 +104,7 @@ impl KdeBackend {
                 let stream = std::os::unix::net::UnixStream::connect(&path).map_err(|e| {
                     BackendError::unavailable(format!("cannot reach `{}`: {e}", path.display()))
                 })?;
-                Connection::from_socket(stream)
-                    .map_err(|e| BackendError::unavailable(format!("no Wayland session: {e}")))?
+                Connection::from_socket(stream).map_err(|e| no_session(&e))?
             }
         };
         let (globals, queue) = registry_queue_init::<State>(&conn)
@@ -111,12 +118,19 @@ impl KdeBackend {
         let order: Option<KdeOutputOrderV1> = globals.bind(&qh, 1..=1, ()).ok();
 
         let mut state = State::default();
-        let registry = globals.registry();
-        for global in globals.contents().clone_list() {
-            if global.interface == KdeOutputDeviceV2::interface().name {
-                let version = global.version.min(DEVICE_MAX_VERSION);
-                let proxy: KdeOutputDeviceV2 = registry.bind(global.name, version, &qh, ());
-                state.devices.push(Device::new(proxy));
+        // Newer KWin lists outputs through a registry object; older KWin
+        // makes each output a global of its own.
+        let device_registry: Option<KdeOutputDeviceRegistryV2> = globals
+            .bind(&qh, REGISTRY_MIN_VERSION..=DEVICE_MAX_VERSION, ())
+            .ok();
+        if device_registry.is_none() {
+            let registry = globals.registry();
+            for global in globals.contents().clone_list() {
+                if global.interface == KdeOutputDeviceV2::interface().name {
+                    let version = global.version.min(DEVICE_MAX_VERSION);
+                    let proxy: KdeOutputDeviceV2 = registry.bind(global.name, version, &qh, ());
+                    state.devices.push(Device::new(proxy));
+                }
             }
         }
         state.ordered = order.is_some();
@@ -148,7 +162,7 @@ impl KdeBackend {
             self.state
                 .devices
                 .iter()
-                .map(|d| d.to_output(&self.state.modes, &self.state.order))
+                .map(|d| d.to_output(&self.state))
                 .collect(),
         )
     }
@@ -161,10 +175,22 @@ impl KdeBackend {
             .iter()
             .find(|o| o.enabled && o.mirror_of.is_some())
         {
-            return Err(BackendError::unsupported(format!(
-                "KDE output management cannot mirror outputs (`{}`); use Plasma's display settings",
-                mirror.name
-            )));
+            if self.management.version() < MANAGEMENT_MIRRORING {
+                return Err(BackendError::unsupported(format!(
+                    "this KWin cannot mirror outputs (`{}`); Plasma 6.3 or later can",
+                    mirror.name
+                )));
+            }
+            let source = mirror.mirror_of.as_deref().unwrap_or_default();
+            if !desired
+                .get(source)
+                .is_some_and(|s| s.enabled && s.mirror_of.is_none())
+            {
+                return Err(BackendError::rejected(format!(
+                    "`{}` mirrors `{source}`, which is off or itself a mirror",
+                    mirror.name
+                )));
+            }
         }
         for output in &desired.outputs {
             if !self.state.devices.iter().any(|d| d.name == output.name) {
@@ -178,7 +204,7 @@ impl KdeBackend {
             .devices
             .iter()
             .map(|device| {
-                let current = device.to_output(&self.state.modes, &self.state.order);
+                let current = device.to_output(&self.state);
                 let want = desired.get(&device.name).unwrap_or(&current).clone();
                 let mode = if want.enabled {
                     let target = want.mode.or_else(|| want.preferred_mode()).ok_or_else(|| {
@@ -212,7 +238,26 @@ impl KdeBackend {
             };
             config.mode(proxy, mode);
             config.transform(proxy, transform_to_kde(r.want.transform));
-            config.position(proxy, r.want.position.x, r.want.position.y);
+            let source = r
+                .want
+                .mirror_of
+                .as_deref()
+                .and_then(|s| self.state.device(s));
+            let position = source
+                .and_then(|s| desired.get(&s.name))
+                .map_or(r.want.position, |s| s.position);
+            config.position(proxy, position.x, position.y);
+            if self.management.version() >= MANAGEMENT_MIRRORING
+                && r.want.mirror_of
+                    != current
+                        .get(&r.device.name)
+                        .and_then(|o| o.mirror_of.clone())
+            {
+                config.set_replication_source(
+                    proxy,
+                    source.map_or(String::new(), |s| s.uuid.clone()),
+                );
+            }
             config.scale(proxy, r.want.scale.as_f64());
             let old = current.get(&r.device.name).and_then(|o| o.adaptive_sync);
             if let Some(sync) = r
@@ -299,7 +344,7 @@ impl Backend for KdeBackend {
     fn capabilities(&self) -> Capabilities {
         let vrr = self.state.devices.iter().any(Device::has_vrr);
         Capabilities {
-            mirroring: false,
+            mirroring: self.management.version() >= MANAGEMENT_MIRRORING,
             adaptive_sync: vrr,
             adaptive_sync_automatic: vrr,
             primary: self.management.version() >= 2,
@@ -393,6 +438,9 @@ struct Device {
     scale: f64,
     capabilities: u32,
     vrr_policy: Option<AdaptiveSync>,
+    uuid: String,
+    /// UUID of the output this one mirrors; empty when none.
+    replication_source: String,
 }
 
 impl Device {
@@ -412,6 +460,8 @@ impl Device {
             scale: 1.0,
             capabilities: 0,
             vrr_policy: None,
+            uuid: String::new(),
+            replication_source: String::new(),
         }
     }
 
@@ -435,7 +485,8 @@ impl Device {
             .map(|m| &m.proxy)
     }
 
-    fn to_output(&self, modes: &[ModeEntry], order: &[String]) -> Output {
+    fn to_output(&self, state: &State) -> Output {
+        let (modes, order) = (&state.modes, &state.order);
         let lookup = |id: &ObjectId| modes.iter().find(|m| &m.proxy.id() == id).map(|m| m.mode);
         let mut output = Output::new(self.name.clone());
         output.make.clone_from(&self.make);
@@ -457,7 +508,14 @@ impl Device {
         output.transform = self.transform;
         output.scale = Scale::from_f64(self.scale).unwrap_or(Scale::ONE);
         output.adaptive_sync = self.vrr_policy.filter(|_| self.has_vrr());
-        output.primary = self.enabled && order.first() == Some(&self.name);
+        output.mirror_of = state
+            .devices
+            .iter()
+            .find(|d| !self.replication_source.is_empty() && d.uuid == self.replication_source)
+            .map(|d| d.name.clone())
+            .filter(|_| self.enabled);
+        output.primary =
+            self.enabled && output.mirror_of.is_none() && order.first() == Some(&self.name);
         output
     }
 }
@@ -477,6 +535,10 @@ struct State {
 }
 
 impl State {
+    fn device(&self, name: &str) -> Option<&Device> {
+        self.devices.iter().find(|d| d.name == name)
+    }
+
     fn device_mut(&mut self, id: &ObjectId) -> Option<&mut Device> {
         self.devices.iter_mut().find(|d| &d.proxy.id() == id)
     }
@@ -563,12 +625,37 @@ impl Dispatch<KdeOutputDeviceV2, ()> for State {
             Event::Capabilities { flags } => device.capabilities = flags.into(),
             Event::VrrPolicy { vrr_policy } => device.vrr_policy = Some(vrr_from_kde(vrr_policy)),
             Event::Name { name } => device.name = name,
+            Event::Uuid { uuid } => device.uuid = uuid,
+            Event::ReplicationSource { source } => device.replication_source = source,
+            Event::Removed => {
+                let id = proxy.id();
+                state.devices.retain(|d| d.proxy.id() != id);
+            }
             _ => {}
         }
     }
 
     event_created_child!(State, KdeOutputDeviceV2, [
         kde_output_device_v2::EVT_MODE_OPCODE => (KdeOutputDeviceModeV2, ()),
+    ]);
+}
+
+impl Dispatch<KdeOutputDeviceRegistryV2, ()> for State {
+    fn event(
+        state: &mut Self,
+        _: &KdeOutputDeviceRegistryV2,
+        event: kde_output_device_registry_v2::Event,
+        (): &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        if let kde_output_device_registry_v2::Event::Output { output } = event {
+            state.devices.push(Device::new(output));
+        }
+    }
+
+    event_created_child!(State, KdeOutputDeviceRegistryV2, [
+        kde_output_device_registry_v2::EVT_OUTPUT_OPCODE => (KdeOutputDeviceV2, ()),
     ]);
 }
 
@@ -638,7 +725,6 @@ impl Dispatch<KdeOutputConfigurationV2, ()> for State {
             Event::Applied => state.result = Some(true),
             Event::Failed => state.result = Some(false),
             Event::FailureReason { reason } => state.failure_reason = non_empty(reason),
-            _ => {}
         }
     }
 }
@@ -659,8 +745,20 @@ impl Dispatch<KdeOutputOrderV1, ()> for State {
             kde_output_order_v1::Event::Done => {
                 state.order = std::mem::take(&mut state.pending_order);
             }
-            _ => {}
         }
+    }
+}
+
+/// Explains a failed Wayland connection. A missing `libwayland-client` is
+/// called out by name: the GUI toolkit makes the binary load it at run
+/// time, and builds outside a Nix environment cannot find it on NixOS.
+fn no_session(error: &wayland_client::ConnectError) -> BackendError {
+    match error {
+        wayland_client::ConnectError::NoWaylandLib => BackendError::unavailable(
+            "libwayland-client.so could not be loaded; install it, or on NixOS use the packaged \
+             build or put wayland's lib directory on LD_LIBRARY_PATH",
+        ),
+        other => BackendError::unavailable(format!("no Wayland session: {other}")),
     }
 }
 
