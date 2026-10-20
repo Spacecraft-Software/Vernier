@@ -18,5 +18,5 @@
   COSMIC extension; no code was copied.
 - **kanshi** and **shikane** — prior art for profile matching by display
   identity.
-- **wayland-rs**, **iced**, **clap**, **serde** and **toml** — the Rust crates
+- **wayland-rs**, **x11rb**, **zbus**, **iced**, **clap**, **serde** and **toml** — the Rust crates
   Vernier is built on, under their respective licenses.

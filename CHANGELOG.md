@@ -41,4 +41,14 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
   then KWin's.
 - CSV output always has the same columns, even when an optional value is
   absent from every row.
-- Stub crate for the GNOME backend.
+- GNOME backend over `org.gnome.Mutter.DisplayConfig` (`zbus`): monitors,
+  modes and supported scales, position, rotation, scale, primary output,
+  mirroring (monitors sharing a logical monitor), and a real test-only apply
+  (Mutter's verify method). Positions are translated in Mutter's physical
+  layout mode, where a scaled monitor still covers its full pixel size.
+  Changes are temporary, lasting until logout, so GNOME Shell's own
+  confirmation dialog does not duplicate Vernier's. Tested against headless
+  Mutter 46.
+- Backend detection also falls back to KWin's and Mutter's protocols on
+  desktops it does not recognize, and reports the first backend's reason
+  when none answers.

@@ -19,7 +19,7 @@ Pre-release (0.1.0). Milestone progress is tracked in [`PLAN.md`](PLAN.md).
 | `wlr` | niri, sway, Hyprland, river, labwc, Wayfire | Working; tested against headless sway |
 | `cosmic` | COSMIC (wlr + `zcosmic_output_manager_v1` v3) | Implemented; not yet tested on COSMIC |
 | `kde` | KDE Plasma (`kde-output-management-v2`) | Working; tested against headless KWin 5.27. Mirroring (Plasma 6.3+) unverified |
-| `mutter` | GNOME (`org.gnome.Mutter.DisplayConfig`) | Planned (M4) |
+| `mutter` | GNOME (`org.gnome.Mutter.DisplayConfig`) | Working; tested against headless Mutter 46. Changes last until logout |
 | `x11` | Any X11 session (`RandR` 1.3+) | Working; tested against the Xorg dummy driver and on a ThinkPad T490s (Intel). Custom modes pending |
 
 ## What it does better than the originals

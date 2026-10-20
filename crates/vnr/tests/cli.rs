@@ -70,6 +70,7 @@ impl Sandbox {
             "SPACECRAFT_THEME",
             "SPACECRAFT_A11Y",
             "WAYLAND_DISPLAY",
+            "DBUS_SESSION_BUS_ADDRESS",
             "DISPLAY",
             "XDG_RUNTIME_DIR",
         ] {
@@ -338,8 +339,8 @@ fn errors_are_single_line_json_with_runnable_hints() {
         ),
         (
             &["--backend", "mutter", "output", "list"],
-            11,
-            "UNSUPPORTED",
+            10,
+            "BACKEND_UNAVAILABLE",
         ),
     ];
     for (args, exit, code) in cases {

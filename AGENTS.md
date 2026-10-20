@@ -17,8 +17,8 @@ and ARandR (X11). Spacecraft Software project; maintainer Mohamed Hammad.
 | `crates/vnr-core` | Model, geometry, validation, profiles, exporters, `Backend` trait. No I/O. |
 | `crates/vnr-wlr` | wlr-output-management v4 + COSMIC extension (vendored XML in `protocols/`). |
 | `crates/vnr-x11` | X11 `RandR` through `x11rb`'s pure-Rust connection. `state.rs` holds the pure snapshot/plan logic. |
-| `crates/vnr-kde` | KDE Plasma through `kde_output_device_v2` / `kde_output_management_v2` (`wayland-protocols-plasma`). `plan.rs` holds output priorities. |
-| `crates/vnr-mutter` | Backend stub; see PLAN.md M4. |
+| `crates/vnr-kde` | KDE Plasma through `kde_output_device_v2` / `kde_output_management_v2`, compiled from the vendored XML in `protocols/` (keep it as new as current KWin's, or unknown events abort the connection). `plan.rs` holds output priorities. |
+| `crates/vnr-mutter` | GNOME through `org.gnome.Mutter.DisplayConfig` over `zbus`. `state.rs` holds the pure logical-monitor translation, including physical-layout reflow. |
 | `crates/vnr-backends` | Run-time detection, `open()`, and the `fixture` backend (`VNR_FIXTURE=<file.json>`). |
 | `crates/vnr-theme` | Steelbore tokens and §11.6 theme resolution, shared by CLI colors and the editor. `assets/steelbore.toml` is the canonical palette, never edited by hand. |
 | `crates/vnr-gui` | iced editor. |
@@ -51,6 +51,14 @@ grant, run a copy of the binary):
 ```nushell
 with-env { QT_QPA_PLATFORM: offscreen } { kwin_wayland --virtual --width 1920 --height 1080 --output-count 2 --socket kwin-test }
 VNR_KDE_TEST_DISPLAY=kwin-test cargo test -p vnr-kde -- --include-ignored
+```
+
+The GNOME backend has one against a headless Mutter on a private bus:
+
+```nushell
+let bus = (dbus-daemon --session --fork --print-address=1 | lines | first)
+with-env { DBUS_SESSION_BUS_ADDRESS: $bus } { mutter --headless --wayland --no-x11 --wayland-display mutter-test --virtual-monitor 1920x1080 --virtual-monitor 1920x1080 }
+VNR_MUTTER_TEST_BUS=$bus cargo test -p vnr-mutter -- --include-ignored
 ```
 
 Changes land through a pull request that is squash-merged on GitHub, which
