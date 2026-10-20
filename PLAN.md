@@ -37,8 +37,11 @@ MVP: M0–M7 — Vernier v1.0
 
 ## M3 — KDE Plasma backend
 
-- [ ] P-021 `kde_output_device_v2` snapshot, including replication source and VRR policy
-- [ ] P-022 `kde_output_management_v2` apply; output order for the primary output
+- [x] P-021 `kde_output_device_v2` snapshot: modes, position, rotation, scale, VRR policy, identity
+- [x] P-022 `kde_output_management_v2` apply; output priority (`kde_output_order_v1`) for the primary output
+- [ ] P-040 Mirroring on Plasma (replication source; not in the protocol versions `wayland-protocols-plasma` 0.3.12 ships)
+- [ ] P-041 Run the headless `KWin` test (`crates/vnr-kde/tests/kwin_virtual.rs`) in CI
+- [ ] P-042 Verify on real Plasma 6 hardware, including VRR
 
 ## M4 — GNOME backend
 

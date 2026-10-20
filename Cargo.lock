@@ -3879,6 +3879,8 @@ name = "vnr-kde"
 version = "0.1.0"
 dependencies = [
  "vnr-core",
+ "wayland-client",
+ "wayland-protocols-plasma",
 ]
 
 [[package]]

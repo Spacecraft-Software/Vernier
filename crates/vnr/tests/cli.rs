@@ -336,7 +336,11 @@ fn errors_are_single_line_json_with_runnable_hints() {
             10,
             "BACKEND_UNAVAILABLE",
         ),
-        (&["--backend", "kde", "output", "list"], 11, "UNSUPPORTED"),
+        (
+            &["--backend", "mutter", "output", "list"],
+            11,
+            "UNSUPPORTED",
+        ),
     ];
     for (args, exit, code) in cases {
         let out = sandbox.run(args);

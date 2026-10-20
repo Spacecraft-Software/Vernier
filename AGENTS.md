@@ -17,7 +17,8 @@ and ARandR (X11). Spacecraft Software project; maintainer Mohamed Hammad.
 | `crates/vnr-core` | Model, geometry, validation, profiles, exporters, `Backend` trait. No I/O. |
 | `crates/vnr-wlr` | wlr-output-management v4 + COSMIC extension (vendored XML in `protocols/`). |
 | `crates/vnr-x11` | X11 `RandR` through `x11rb`'s pure-Rust connection. `state.rs` holds the pure snapshot/plan logic. |
-| `crates/vnr-kde`, `vnr-mutter` | Backend stubs; see PLAN.md M3–M4. |
+| `crates/vnr-kde` | KDE Plasma through `kde_output_device_v2` / `kde_output_management_v2` (`wayland-protocols-plasma`). `plan.rs` holds output priorities. |
+| `crates/vnr-mutter` | Backend stub; see PLAN.md M4. |
 | `crates/vnr-backends` | Run-time detection, `open()`, and the `fixture` backend (`VNR_FIXTURE=<file.json>`). |
 | `crates/vnr-theme` | Steelbore tokens and §11.6 theme resolution, shared by CLI colors and the editor. `assets/steelbore.toml` is the canonical palette, never edited by hand. |
 | `crates/vnr-gui` | iced editor. |
@@ -43,6 +44,18 @@ Xorg :5 -noreset -nolisten tcp -config crates/vnr-x11/tests/dummy.conf
 VNR_X11_TEST_DISPLAY=:5 cargo test -p vnr-x11 -- --include-ignored
 ```
 
+The KDE backend has one against a headless `KWin` with two virtual outputs
+(on hosts where `kwin_wayland` carries file capabilities a container cannot
+grant, run a copy of the binary):
+
+```nushell
+with-env { QT_QPA_PLATFORM: offscreen } { kwin_wayland --virtual --width 1920 --height 1080 --output-count 2 --socket kwin-test }
+VNR_KDE_TEST_DISPLAY=kwin-test cargo test -p vnr-kde -- --include-ignored
+```
+
+Changes land through a pull request that is squash-merged on GitHub, which
+signs the merge commit; agents never sign commits themselves.
+
 ## CLI invariants (Spacecraft CLI Standard v1.1)
 
 - Grammar is `vnr <noun> <verb>`. A new leaf command needs a `Spec` entry in
@@ -67,5 +80,6 @@ VNR_X11_TEST_DISPLAY=:5 cargo test -p vnr-x11 -- --include-ignored
 - Colors only through `theme::Steelbore` tokens; no hex literals in UI code.
 - Library crates use canonical error structs (`BackendError`, `ProfileError`);
   only `vnr-gui` uses `anyhow`; `vnr` uses `AppError`.
-- Commits are signed by the maintainer and pushed over HTTPS (Steelbore
-  Standard §6.3–§6.4). Agents never handle signing keys.
+- Commits on `main` are signed: by the maintainer, or by GitHub when it
+  squash-merges a pull request. Pushes go over HTTPS (Steelbore Standard
+  §6.3–§6.4). Agents never handle signing keys.

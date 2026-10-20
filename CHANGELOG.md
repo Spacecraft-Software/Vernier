@@ -29,4 +29,12 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
   Verified on real hardware (ThinkPad T490s, Intel modesetting driver).
 - `vnr output get` shows make, model and serial, and lists modes under
   `available` so `mode` always means the current one.
-- Stub crates for the KDE and GNOME backends.
+- KDE Plasma backend over `kde_output_device_v2` and
+  `kde_output_management_v2`: modes, position, rotation, fractional scale,
+  VRR policy, and the primary output through output priorities. Plasma keeps
+  applied changes across restarts. Tested against headless `KWin`.
+- Backend detection tries the desktop's own protocol first, then wlr,
+  then KWin's.
+- CSV output always has the same columns, even when an optional value is
+  absent from every row.
+- Stub crate for the GNOME backend.
