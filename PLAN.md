@@ -19,7 +19,7 @@ MVP: M0–M7 — Vernier v1.0
 - [x] P-010 Confirm-or-revert on CLI and in the editor
 - [x] P-011 iced editor: drag with snapping, properties panel, problems list
 - [x] P-012 Steelbore theme with §11.6 resolution and §18.1 accessible toggle
-- [x] P-013 End-to-end test against headless sway
+- [x] P-013 End-to-end test against headless sway (`crates/vnr-wlr/tests/sway_headless.rs`, in CI)
 - [ ] P-014 Verify on niri (real hardware)
 - [ ] P-015 Verify on COSMIC (real hardware), including mirroring
 - [ ] P-016 Live change tracking (re-read state on compositor `done` events)
@@ -32,7 +32,7 @@ MVP: M0–M7 — Vernier v1.0
 - [x] P-037 Scale via CRTC transform: verified on a ThinkPad T490s (Intel, modesetting), 2026-10-20
 - [ ] P-038 Custom modes (`RRCreateMode` from CVT timings)
 - [ ] P-019 `ScreenChangeNotify` live tracking
-- [ ] P-020 Run the Xorg dummy-driver integration test (`crates/vnr-x11/tests/xorg_dummy.rs`) in CI
+- [x] P-020 Run the Xorg dummy-driver integration test (`crates/vnr-x11/tests/xorg_dummy.rs`) in CI
 - [x] P-039 Verify on real X11 hardware: scale, rotation, revert and EDID identity on a ThinkPad T490s, 2026-10-20
 
 ## M3 — KDE Plasma backend
@@ -40,7 +40,7 @@ MVP: M0–M7 — Vernier v1.0
 - [x] P-021 `kde_output_device_v2` snapshot: modes, position, rotation, scale, VRR policy, identity
 - [x] P-022 `kde_output_management_v2` apply; output priority (`kde_output_order_v1`) for the primary output
 - [ ] P-040 Mirroring on Plasma 6.3+ (`set_replication_source`): implemented, verify on real Plasma
-- [ ] P-041 Run the headless `KWin` test (`crates/vnr-kde/tests/kwin_virtual.rs`) in CI
+- [x] P-041 Run the headless `KWin` test (`crates/vnr-kde/tests/kwin_virtual.rs`) in CI
 - [x] P-042 Verify on real Plasma 6 hardware: snapshot, scale, rotation, revert on the maintainer's ThinkPad T490s, 2026-10-21
 - [ ] P-046 Verify VRR policy on Plasma with an adaptive-sync monitor
 
@@ -49,7 +49,7 @@ MVP: M0–M7 — Vernier v1.0
 - [x] P-023 `org.gnome.Mutter.DisplayConfig` `GetCurrentState` via `zbus`
 - [x] P-024 `ApplyMonitorsConfig`: verify (as `test`) and temporary; mirroring as shared logical monitors; physical and logical layout modes
 - [ ] P-043 Persistent GNOME changes without GNOME Shell's own confirm dialog doubling Vernier's (today: temporary only)
-- [ ] P-044 Run the headless Mutter test (`crates/vnr-mutter/tests/mutter_headless.rs`) in CI
+- [x] P-044 Run the headless Mutter test (`crates/vnr-mutter/tests/mutter_headless.rs`) in CI
 - [ ] P-045 Verify on real GNOME hardware, including fractional scaling in logical layout mode
 
 ## M5 — Release hardening
