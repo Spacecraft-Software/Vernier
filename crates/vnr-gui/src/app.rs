@@ -21,6 +21,8 @@ use vnr_core::{
     Severity, Transform, export, validate,
 };
 
+use vnr_config::{Action, Chord, KeyMap};
+
 use crate::Options;
 use crate::arrangement::{Arrangement, CanvasEvent};
 use crate::theme::{self, Resolution, Steelbore};
@@ -74,23 +76,51 @@ impl fmt::Display for MirrorChoice {
 /// Keyboard commands (Steelbore Standard §10: CUA and Vim bindings).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyCommand {
-    /// `]` or Page Down: select the next output. (Tab is left to move
-    /// keyboard focus between controls.)
+    /// Select the next output. (Tab is left to move keyboard focus.)
     Next,
-    /// `[` or Page Up: select the previous output.
+    /// Select the previous output.
     Previous,
-    /// Arrows or h/j/k/l: move the selected output (Shift: by 10).
+    /// Move the selected output by this many pixels.
     Nudge(i32, i32),
-    /// Ctrl+Enter or Ctrl+S: apply.
+    /// Apply.
     Apply,
-    /// Escape: revert a pending change, otherwise discard edits.
+    /// Revert a pending change, otherwise discard edits.
     Escape,
-    /// F5 or Ctrl+R: reload from the display server.
+    /// Reload from the display server.
     Reload,
-    /// y: keep a pending change.
+    /// Keep a pending change.
     Yes,
-    /// n: revert a pending change.
+    /// Revert a pending change.
     No,
+}
+
+impl KeyCommand {
+    /// The command an action means; `shift` moves ten pixels instead of one.
+    const fn from_action(action: Action, shift: bool) -> Self {
+        let step = if shift { 10 } else { 1 };
+        match action {
+            Action::Apply => Self::Apply,
+            Action::Reload => Self::Reload,
+            Action::Discard => Self::Escape,
+            Action::Keep => Self::Yes,
+            Action::Revert => Self::No,
+            Action::Next => Self::Next,
+            Action::Previous => Self::Previous,
+            Action::Left => Self::Nudge(-step, 0),
+            Action::Right => Self::Nudge(step, 0),
+            Action::Up => Self::Nudge(0, -step),
+            Action::Down => Self::Nudge(0, step),
+        }
+    }
+}
+
+/// A key press, before the key map decides what it means.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyPress {
+    chord: Chord,
+    shift: bool,
+    /// No widget used the key press.
+    free: bool,
 }
 
 /// Application messages.
@@ -140,14 +170,15 @@ pub enum Message {
     Reload,
     /// Discard edits.
     Reset,
-    /// A keyboard command.
-    Key(KeyCommand),
+    /// A key was pressed; the key map decides what it does.
+    KeyPress(KeyPress),
 }
 
 /// The editor.
 #[derive(Debug)]
 pub struct App {
     options: Options,
+    keys: KeyMap,
     resolution: Resolution,
     theme: Theme,
     kind: Option<BackendKind>,
@@ -245,6 +276,7 @@ impl App {
             eprintln!("{}", resolution.report());
         }
         let app = Self {
+            keys: options.config.keys.clone(),
             theme: theme::iced_theme(&resolution.tokens),
             resolution,
             kind: None,
@@ -256,7 +288,10 @@ impl App {
             y_text: String::new(),
             pending: None,
             busy: Some("Reading displays"),
-            status: String::new(),
+            status: options
+                .config_problem
+                .as_ref()
+                .map_or_else(String::new, |p| format!("Default key bindings: {p}")),
             issues: Vec::new(),
             overlapping: Vec::new(),
             options,
@@ -462,7 +497,14 @@ impl App {
                 self.draft = self.applied.clone();
                 self.edited();
             }
-            Message::Key(command) => return self.key(command),
+            Message::KeyPress(press) => {
+                return match self.keys.action(&press.chord) {
+                    Some(action) if press.free || press.chord.always_applies() => {
+                        self.key(KeyCommand::from_action(action, press.shift))
+                    }
+                    _ => Task::none(),
+                };
+            }
         }
         Task::none()
     }
@@ -928,25 +970,80 @@ fn key_command(
     let iced::Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event else {
         return None;
     };
-    let free = status == iced::event::Status::Ignored;
-    let step = if modifiers.shift() { 10 } else { 1 };
-    let command = match key.as_ref() {
-        Key::Named(Named::Enter) | Key::Character("s") if modifiers.command() => KeyCommand::Apply,
-        Key::Character("r") if modifiers.command() => KeyCommand::Reload,
-        Key::Named(Named::F5) => KeyCommand::Reload,
-        Key::Named(Named::Escape) => KeyCommand::Escape,
-        _ if !free || modifiers.command() || modifiers.alt() => return None,
-        Key::Named(Named::PageDown) | Key::Character("]") => KeyCommand::Next,
-        Key::Named(Named::PageUp) | Key::Character("[") => KeyCommand::Previous,
-        Key::Named(Named::ArrowLeft) | Key::Character("h") => KeyCommand::Nudge(-step, 0),
-        Key::Named(Named::ArrowRight) | Key::Character("l") => KeyCommand::Nudge(step, 0),
-        Key::Named(Named::ArrowUp) | Key::Character("k") => KeyCommand::Nudge(0, -step),
-        Key::Named(Named::ArrowDown) | Key::Character("j") => KeyCommand::Nudge(0, step),
-        Key::Character("y") => KeyCommand::Yes,
-        Key::Character("n") => KeyCommand::No,
-        _ => return None,
-    };
-    Some(Message::Key(command))
+    Some(Message::KeyPress(KeyPress {
+        chord: Chord::new(
+            modifiers.control(),
+            modifiers.alt(),
+            chord_key(&key.as_ref())?,
+        ),
+        shift: modifiers.shift(),
+        free: status == iced::event::Status::Ignored,
+    }))
+}
+
+/// The configuration's name for an iced key, if it can be bound.
+fn chord_key(key: &Key<&str>) -> Option<vnr_config::Key> {
+    use vnr_config::Key as K;
+    Some(match key {
+        Key::Character(text) => {
+            let mut chars = text.chars();
+            match (chars.next(), chars.next()) {
+                (Some(c), None) => K::character(c),
+                _ => return None,
+            }
+        }
+        Key::Named(named) => match named {
+            Named::Enter => K::Enter,
+            Named::Escape => K::Escape,
+            Named::Space => K::Space,
+            Named::Backspace => K::Backspace,
+            Named::Delete => K::Delete,
+            Named::Insert => K::Insert,
+            Named::Home => K::Home,
+            Named::End => K::End,
+            Named::PageUp => K::PageUp,
+            Named::PageDown => K::PageDown,
+            Named::ArrowLeft => K::Left,
+            Named::ArrowRight => K::Right,
+            Named::ArrowUp => K::Up,
+            Named::ArrowDown => K::Down,
+            other => K::Function(function_number(*other)?),
+        },
+        Key::Unidentified => return None,
+    })
+}
+
+/// F1 to F24 as their number.
+fn function_number(named: Named) -> Option<u8> {
+    const KEYS: [Named; 24] = [
+        Named::F1,
+        Named::F2,
+        Named::F3,
+        Named::F4,
+        Named::F5,
+        Named::F6,
+        Named::F7,
+        Named::F8,
+        Named::F9,
+        Named::F10,
+        Named::F11,
+        Named::F12,
+        Named::F13,
+        Named::F14,
+        Named::F15,
+        Named::F16,
+        Named::F17,
+        Named::F18,
+        Named::F19,
+        Named::F20,
+        Named::F21,
+        Named::F22,
+        Named::F23,
+        Named::F24,
+    ];
+    KEYS.iter()
+        .position(|k| *k == named)
+        .and_then(|i| u8::try_from(i + 1).ok())
 }
 
 fn demo_capabilities() -> Capabilities {
@@ -1057,10 +1154,10 @@ mod tests {
     fn keep_stops_the_countdown() {
         let mut app = demo_app();
         let _ = app.update(Message::Select(1));
-        let _ = app.update(Message::Key(KeyCommand::Nudge(0, 10)));
+        let _ = app.key(KeyCommand::Nudge(0, 10));
         let _ = app.update(Message::Apply);
         let _ = app.update(Message::Applied(Ok(())));
-        let _ = app.update(Message::Key(KeyCommand::Yes));
+        let _ = app.key(KeyCommand::Yes);
         assert!(app.pending.is_none());
         assert_eq!(app.applied.outputs[1].position.y, 10);
     }
@@ -1109,6 +1206,47 @@ mod tests {
         let _ = app.update(Message::Select(0));
         let _ = app.update(Message::SetScale(Scale::ONE));
         assert!(!app.can_save_niri(), "unapplied edits are not saved");
+    }
+
+    fn press(app: &mut App, text: &str, free: bool) {
+        let _ = app.update(Message::KeyPress(KeyPress {
+            chord: text.parse().unwrap(),
+            shift: false,
+            free,
+        }));
+    }
+
+    #[test]
+    fn plain_keys_wait_for_a_free_press_and_rebinding_moves_them() {
+        let mut app = demo_app();
+        let _ = app.update(Message::Select(1));
+        let x = app.draft.outputs[1].position.x;
+        press(&mut app, "l", false);
+        assert_eq!(
+            app.draft.outputs[1].position.x, x,
+            "a text field had the key"
+        );
+        press(&mut app, "l", true);
+        assert_eq!(app.draft.outputs[1].position.x, x + 1);
+
+        let right = vec!["d".to_owned()];
+        app.keys = KeyMap::with_overrides([("right", right.as_slice())]).unwrap();
+        press(&mut app, "l", true);
+        assert_eq!(app.draft.outputs[1].position.x, x + 1, "l is unbound now");
+        press(&mut app, "d", true);
+        assert_eq!(app.draft.outputs[1].position.x, x + 2);
+    }
+
+    #[test]
+    fn function_keys_map_by_number() {
+        assert_eq!(function_number(Named::F5), Some(5));
+        assert_eq!(function_number(Named::F24), Some(24));
+        assert_eq!(function_number(Named::Tab), None);
+        assert_eq!(chord_key(&Key::Named(Named::Tab)), None);
+        assert_eq!(
+            chord_key(&Key::Character("S")),
+            Some(vnr_config::Key::Character('s'))
+        );
     }
 
     #[test]

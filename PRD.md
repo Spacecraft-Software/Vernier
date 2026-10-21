@@ -118,7 +118,7 @@ Each requirement keeps its identifier for life; a withdrawn one is struck throug
 | R-030 | The editor shall let the user drag outputs, snapping edges within 12 screen pixels; Shift shall disable snapping. | mandatory | Demonstration | Verified |
 | R-031 | The editor shall set enabled, mode, scale, rotation, position, mirror, adaptive sync and primary for the selected output. | mandatory | Test + demonstration | Verified |
 | R-032 | Every editor action shall be reachable from the keyboard, with CUA and Vim bindings. | mandatory | Test | Verified |
-| R-033 | Key bindings shall be remappable from the configuration file. | mandatory | Test | Planned |
+| R-033 | Key bindings shall be remappable from the configuration file. | mandatory | Test | Verified |
 | R-034 | The CLI shall offer `list`, `backend`, `save`, `apply`, `set`, `export` and `gui`; `list` and `backend` shall print JSON on request. | mandatory | Test | Verified |
 | R-035 | `vnr gui --demo` shall run the editor on a sample layout without contacting any display server. | expected | Test | Verified |
 
@@ -171,6 +171,8 @@ The editor is a canvas of output rectangles on the left and a properties panel o
 | Reload from the server | F5, Ctrl+R |  |
 
 Tab is left to move keyboard focus between controls. Plain-letter bindings apply only when no text field has focus.
+
+Every binding can be changed in `~/.config/vernier/config.ncl` (Nickel), by action name: `apply`, `reload`, `discard`, `keep`, `revert`, `next`, `previous`, `left`, `right`, `up`, `down`. `vnr config check` validates the file.
 
 **Command line**
 
@@ -252,7 +254,6 @@ Vernier is Category C under the Steelbore Standard: a bad configuration is visib
 | Date | Clause | Gap | Closes in |
 | --- | --- | --- | --- |
 | 2026-10-18 | §18.3 | No accessible names or roles in the editor (iced has no AccessKit yet) | M6 |
-| 2026-10-18 | §10 | Key bindings not yet remappable | M6 |
 | 2026-10-18 | §8 | No Texinfo manual | M7 |
 | 2026-10-18 | §5.5 | Guix and PKGBUILD packages missing; Nix package not yet built on Bravais | M7 |
 | 2026-10-18 | §20 | Requirements kept in this PRD, not yet mirrored in `AGENTS.md` | M7 |
@@ -260,9 +261,9 @@ Vernier is Category C under the Steelbore Standard: a bad configuration is visib
 ## Open questions
 
 - [ ] **Short code.** Is `VNR` the registry short code, matching the binary name?
-- [ ] **Configuration language.** TOML for profiles and settings, or Nickel as for Fairing's themes?
+- [x] **Configuration language.** Nickel for settings (`config.ncl`), TOML for profiles (decided 2026-10-21).
 - [x] **Persistence on niri.** Only on request: `--persist FILE` on `output set` and `profile apply`, and Save for niri in the editor (decided 2026-10-21).
 - [ ] **Budgets.** Confirm or change the proposed ceilings in R-110 to R-113.
-- [ ] **Accessibility path.** Wait for AccessKit in iced, or move the editor to a toolkit that has it before 1.0?
+- [x] **Accessibility path.** Wait for AccessKit in upstream iced; the CLI stays the accessible path until then (decided 2026-10-21).
 - [ ] **Backend order.** X11 (M2) before KDE (M3) and GNOME (M4), or the other way round?
 - [ ] **Upstream.** Propose the COSMIC mirroring semantics for wlr-output-management upstream, or stay a consumer?

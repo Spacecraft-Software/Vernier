@@ -82,17 +82,37 @@ directories; `VNR_ALLOWED_PATHS` adds more.
 
 ### Editor keys
 
-| Action | CUA | Vim |
-|---|---|---|
-| Move the selected output by 1 px (Shift: 10) | Arrow keys | `h` `j` `k` `l` |
-| Select the next / previous output | Page Down / Page Up | `]` / `[` |
-| Apply | Ctrl+Enter, Ctrl+S | |
-| Keep / revert a pending change | Keep / Revert buttons | `y` / `n` |
-| Discard edits (or revert a pending change) | Escape | |
-| Reload from the display server | F5, Ctrl+R | |
+| Action | Name | CUA | Vim |
+|---|---|---|---|
+| Move the selected output by 1 px (Shift: 10) | `left` `right` `up` `down` | Arrow keys | `h` `l` `k` `j` |
+| Select the next / previous output | `next` / `previous` | Page Down / Page Up | `]` / `[` |
+| Apply | `apply` | Ctrl+Enter, Ctrl+S | |
+| Keep / revert a pending change | `keep` / `revert` | Keep / Revert buttons | `y` / `n` |
+| Discard edits (or revert a pending change) | `discard` | Escape | |
+| Reload from the display server | `reload` | F5, Ctrl+R | |
 
 Drag an output to move it; edges snap to neighbors, hold Shift to place it
 freely. Tab moves keyboard focus between controls.
+
+Rebind keys in `~/.config/vernier/config.ncl`, a [Nickel](https://nickel-lang.org/)
+file. Each action you list replaces its defaults, an empty list unbinds it,
+and the rest keep theirs. Chords are written `Ctrl+Enter`, `Alt+F2`,
+`PageDown`, `]` or `h`; Shift cannot be bound, because it makes moves ten
+times larger.
+
+```nickel
+{
+  keys = {
+    left = ["Left", "a"],
+    right = ["Right", "d"],
+    keep = ["y", "Enter"],
+  },
+}
+```
+
+`vnr config check` validates the file and lists the bindings in effect. If
+the file has a problem, the editor still opens, with the default bindings,
+and says why in its status line.
 
 ## Building
 
@@ -100,7 +120,7 @@ freely. Tab moves keyboard focus between controls.
 cargo build --release
 ```
 
-Requires Rust 1.88 or later. The binary links only libc; the Wayland
+Requires Rust 1.90 or later. The binary links only libc; the Wayland
 protocol code is pure Rust. At run time the editor loads `libwayland-client`,
 `libxkbcommon` and a Vulkan or OpenGL driver if present, and falls back to a
 software renderer otherwise. On Steelbore OS Bravais,

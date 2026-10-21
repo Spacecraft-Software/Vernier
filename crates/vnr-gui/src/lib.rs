@@ -43,6 +43,10 @@ pub struct Options {
     pub demo: bool,
     /// Report theme and accessibility decisions on standard error.
     pub verbose: bool,
+    /// Settings from the configuration file, or the defaults.
+    pub config: vnr_config::Config,
+    /// Why the configuration file was not used, shown in the status line.
+    pub config_problem: Option<String>,
 }
 
 /// Opens the editor and blocks until its window closes.

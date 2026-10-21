@@ -12,7 +12,12 @@ all-features = true
 # quiet is a reason to look, not to block a release.
 unmaintained = "workspace"
 yanked = "deny"
-ignore = []
+ignore = [
+    # imbl-sized-chunks 0.1.3, pinned by nickel-lang-vector 0.2.0 (vnr-config).
+    # Needs an element whose Drop panics; Nickel's main branch already uses
+    # 0.2. Remove once a nickel-lang-core release carries it.
+    { id = "RUSTSEC-2026-0292", reason = "fixed upstream in Nickel, not yet released" },
+]
 
 [licenses]
 confidence-threshold = 0.9
@@ -25,7 +30,9 @@ allow = [
     "CC0-1.0",
     "GPL-3.0-or-later",
     "ISC",
+    "LGPL-3.0-only",
     "MIT",
+    "MPL-2.0",
     "Unicode-3.0",
     "Unlicense",
     "Zlib",

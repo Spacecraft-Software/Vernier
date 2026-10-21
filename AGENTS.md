@@ -20,6 +20,7 @@ and ARandR (X11). Spacecraft Software project; maintainer Mohamed Hammad.
 | `crates/vnr-kde` | KDE Plasma through `kde_output_device_v2` / `kde_output_management_v2`, compiled from the vendored XML in `protocols/` (keep it as new as current KWin's, or unknown events abort the connection). `plan.rs` holds output priorities. |
 | `crates/vnr-mutter` | GNOME through `org.gnome.Mutter.DisplayConfig` over `zbus`. `state.rs` holds the pure logical-monitor translation, including physical-layout reflow. |
 | `crates/vnr-backends` | Run-time detection, `open()`, and the `fixture` backend (`VNR_FIXTURE=<file.json>`). |
+| `crates/vnr-config` | The Nickel configuration file (`config.ncl`) and the editor's key map; toolkit-independent. |
 | `crates/vnr-theme` | Steelbore tokens and §11.6 theme resolution, shared by CLI colors and the editor. `assets/steelbore.toml` is the canonical palette, never edited by hand. |
 | `crates/vnr-gui` | iced editor. |
 | `crates/vnr` | The `vnr` binary: CLI Standard v1.1 grammar, output modes, errors, schema. |
@@ -31,6 +32,7 @@ cargo fmt --all
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --locked
 cargo deny --locked check             # licenses, sources, advisories (deny.toml)
+                                      # advisory ignores live in deny.toml and .cargo/audit.toml
 cargo audit
 cargo run -p vnr -- gui --demo        # editor on a sample layout, no display changes
 ```

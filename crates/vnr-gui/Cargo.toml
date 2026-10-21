@@ -22,6 +22,7 @@ serde.workspace = true
 vnr-theme.workspace = true
 vnr-backends.workspace = true
 vnr-core.workspace = true
+vnr-config.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
