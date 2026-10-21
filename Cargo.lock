@@ -3869,6 +3869,7 @@ dependencies = [
  "anyhow",
  "iced",
  "serde",
+ "tempfile",
  "vnr-backends",
  "vnr-core",
  "vnr-theme",

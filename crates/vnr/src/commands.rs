@@ -298,16 +298,28 @@ fn output_set(out: &Out, global: &Global, args: &SetArgs) -> Result<(), AppError
             ),
         ));
     }
-    change(out, global, args.timeout, |current| set(current, args))
+    change(
+        out,
+        global,
+        args.timeout,
+        args.persist.as_deref(),
+        |current| set(current, args),
+    )
 }
 
 fn profile_apply(out: &Out, global: &Global, args: &ApplyArgs) -> Result<(), AppError> {
     let (path, profile) = read_profile(out, &args.path)?;
-    change(out, global, args.timeout, |current| {
-        profile
-            .resolve(current)
-            .map_err(|e| AppError::profile(&e, &path.display().to_string()))
-    })
+    change(
+        out,
+        global,
+        args.timeout,
+        args.persist.as_deref(),
+        |current| {
+            profile
+                .resolve(current)
+                .map_err(|e| AppError::profile(&e, &path.display().to_string()))
+        },
+    )
 }
 
 fn read_profile(out: &Out, path: &Path) -> Result<(PathBuf, Profile), AppError> {
@@ -362,8 +374,11 @@ fn change(
     out: &Out,
     global: &Global,
     timeout: u64,
+    persist: Option<&Path>,
     build: impl FnOnce(&Layout) -> Result<Layout, AppError>,
 ) -> Result<(), AppError> {
+    // Refuse a bad `--persist` target before anything on screen changes.
+    let persist = persist.map(|p| persist_target(out, p)).transpose()?;
     let mut backend = open(out, global.backend)?;
     let caps = backend.capabilities();
     let before = snapshot(backend.as_mut())?;
@@ -378,6 +393,7 @@ fn change(
         issues,
         accepted_by_backend: None,
         persistent: caps.persistent,
+        persisted: None,
     };
 
     for issue in found
@@ -390,6 +406,9 @@ fn change(
     if report.changes.is_empty() {
         report.outcome = "unchanged".into();
         out.diag(Severity::Info, "UNCHANGED", "nothing needs to change", None);
+        report.persisted = persist
+            .map(|p| write_persist(out, &p, &before))
+            .transpose()?;
         return emit_report(out, &report);
     }
     if has_errors && !out.dry_run {
@@ -409,6 +428,9 @@ fn change(
     }
     if out.dry_run {
         report.outcome = "planned".into();
+        report.persisted = persist
+            .map(|p| write_persist(out, &p, &desired))
+            .transpose()?;
         return emit_report(out, &report);
     }
     if report.accepted_by_backend == Some(false) {
@@ -431,15 +453,90 @@ fn change(
     } else {
         "applied".into()
     };
-    if !caps.persistent && matches!(backend.kind(), BackendKind::Wlr | BackendKind::Cosmic) {
+    // Reached only when the change was kept: a revert returned early.
+    report.persisted = persist
+        .map(|p| write_persist(out, &p, &desired))
+        .transpose()?;
+    if report.persisted.is_none()
+        && !caps.persistent
+        && matches!(backend.kind(), BackendKind::Wlr | BackendKind::Cosmic)
+    {
         out.diag(
             Severity::Warn,
             "NOT_PERSISTENT",
             "the compositor forgets this change when it restarts",
-            Some("vnr layout export --to niri --write ~/.config/niri/vernier.kdl"),
+            Some(&format!(
+                "{} --persist ~/.config/niri/{}",
+                out.command,
+                export::NIRI_INCLUDE_FILE
+            )),
         );
     }
     emit_report(out, &report)
+}
+
+/// Checks a `--persist` file: inside the allowed roots, not niri's main
+/// config, and either absent or a file Vernier generated.
+fn persist_target(out: &Out, requested: &Path) -> Result<PathBuf, AppError> {
+    let roots = Roots::standard().with_compositor_configs();
+    note_widened(out, &roots);
+    let path = roots.check(requested)?;
+    let include = path.with_file_name(export::NIRI_INCLUDE_FILE);
+    if path.file_name().is_some_and(|name| name == "config.kdl") {
+        return Err(AppError::new(
+            ErrorCode::InvalidArgument,
+            "`--persist` never writes niri's main config; give it a file the config includes",
+            format!("vnr layout export --to niri --write {}", include.display()),
+        ));
+    }
+    match fs::read_to_string(&path) {
+        Ok(existing) if !export::is_generated(&existing) => Err(AppError::new(
+            ErrorCode::Conflict,
+            format!(
+                "`{}` was not written by Vernier, so `--persist` will not replace it",
+                path.display()
+            ),
+            format!("mv {0} {0}.bak", path.display()),
+        )),
+        Err(e) if e.kind() != io::ErrorKind::NotFound => {
+            Err(io_error(&e, &path, "vnr output set <output> --persist"))
+        }
+        _ => Ok(path),
+    }
+}
+
+/// Writes `layout` as niri `output` blocks to a checked `--persist` file.
+fn write_persist(out: &Out, path: &Path, layout: &Layout) -> Result<WriteReport, AppError> {
+    let text = export::niri(layout);
+    let mut report = WriteReport {
+        path: path.display().to_string(),
+        outcome: String::new(),
+        bytes: text.len(),
+    };
+    if fs::read_to_string(path).is_ok_and(|existing| existing == text) {
+        report.outcome = "unchanged".into();
+    } else if out.dry_run {
+        report.outcome = "planned".into();
+    } else {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|e| io_error(&e, parent, "mkdir -p"))?;
+        }
+        fs::write(path, &text)
+            .map_err(|e| io_error(&e, path, "vnr output set <output> --persist"))?;
+        report.outcome = "written".into();
+        out.diag(
+            Severity::Ok,
+            "WRITTEN",
+            &format!(
+                "wrote `{}`; niri loads it through `include \"{}\"` in config.kdl",
+                report.path,
+                path.file_name()
+                    .map_or_else(String::new, |n| n.to_string_lossy().into_owned())
+            ),
+            None,
+        );
+    }
+    Ok(report)
 }
 
 /// Writes the `APPLIED` diagnostic.
@@ -700,7 +797,7 @@ fn layout_export(out: &Out, global: &Global, args: &ExportArgs) -> Result<(), Ap
             global,
             &path,
             &text,
-            "layout export --to <niri|sway> --write",
+            &format!("layout export --to {} --write", args.to),
         )
     } else {
         let record = ExportRecord {

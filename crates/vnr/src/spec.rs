@@ -125,6 +125,7 @@ const CHANGE_ERRORS: &[ErrorCode] = &[
     ErrorCode::InvalidArgument,
     ErrorCode::MissingArgument,
     ErrorCode::NotFound,
+    ErrorCode::PermissionDenied,
     ErrorCode::Conflict,
     ErrorCode::BackendUnavailable,
     ErrorCode::Unsupported,
@@ -216,6 +217,10 @@ pub const SPECS: [Spec; 10] = [
                 "vnr output set eDP-1 --off --yes",
                 "Turn the panel off without the keep-or-revert prompt",
             ),
+            (
+                "vnr output set eDP-1 --scale 1.5 --persist ~/.config/niri/vernier.kdl",
+                "Once kept, save the layout where niri reloads it after a restart",
+            ),
         ],
         errors: CHANGE_ERRORS,
         supports_json: true,
@@ -264,6 +269,10 @@ pub const SPECS: [Spec; 10] = [
                 "vnr profile apply desk.toml --dry-run --json",
                 "List what would change and whether the compositor accepts it",
             ),
+            (
+                "vnr profile apply desk.toml --persist ~/.config/niri/vernier.kdl",
+                "Apply a profile and, once kept, persist it for niri",
+            ),
         ],
         errors: CHANGE_ERRORS,
         supports_json: true,
@@ -288,6 +297,14 @@ pub const SPECS: [Spec; 10] = [
             (
                 "vnr layout export --to sway --profile desk.toml",
                 "Turn a saved profile into sway commands",
+            ),
+            (
+                "vnr layout export --to kanshi --write ~/.config/kanshi/config",
+                "Make a kanshi profile that reapplies this layout on hotplug",
+            ),
+            (
+                "vnr layout export --to home-manager",
+                "Print the same profile as home-manager `services.kanshi` settings",
             ),
         ],
         errors: &[

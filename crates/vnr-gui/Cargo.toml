@@ -23,5 +23,8 @@ vnr-theme.workspace = true
 vnr-backends.workspace = true
 vnr-core.workspace = true
 
+[dev-dependencies]
+tempfile.workspace = true
+
 [lints]
 workspace = true
