@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: 2026 Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Lints and unit tests on every push and pull request, then each display
-# backend's end-to-end test against a real headless server. Actions are
-# pinned to commit SHAs (tag in the trailing comment).
+# Lints, unit tests and supply-chain checks on every push and pull request,
+# then each display backend's end-to-end test against a real headless
+# server. Actions are pinned to commit SHAs (tag in the trailing comment).
 
 name: CI
 
@@ -53,6 +53,19 @@ jobs:
           toolchain: "1.88"
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: cargo check --workspace --all-targets --locked
+
+  supply-chain:
+    name: cargo deny, cargo audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        with:
+          tool: cargo-deny,cargo-audit
+      - run: cargo deny --locked check
+      - run: cargo audit
 
   servers:
     name: end to end (${{ matrix.server }})

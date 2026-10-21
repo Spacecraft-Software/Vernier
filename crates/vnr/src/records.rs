@@ -219,6 +219,9 @@ pub struct ApplyReport {
     pub accepted_by_backend: Option<bool>,
     /// Whether the display server keeps the change across restarts by itself.
     pub persistent: bool,
+    /// The niri include file `--persist` wrote, or would write on a dry run.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub persisted: Option<WriteReport>,
 }
 
 /// What `backend get` prints.
@@ -266,7 +269,7 @@ impl BackendRecord {
     }
 }
 
-/// What `profile save` and `layout export --write` did, or would do.
+/// What `profile save`, `layout export --write` and `--persist` did, or would do.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct WriteReport {
     /// The file, after resolving `.` and `..`.

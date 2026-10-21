@@ -36,8 +36,10 @@ Pre-release (0.1.0). Milestone progress is tracked in [`PLAN.md`](PLAN.md).
   make, model and serial, so a profile survives the monitor moving to another
   port.
 - **Permanent where the compositor forgets.** Changes over wlr-output-management
-  are lost when niri or sway restarts. `vnr layout export --to niri` (or `sway`)
-  prints the config block that makes them permanent.
+  are lost when niri or sway restarts. Add `--persist ~/.config/niri/vernier.kdl`
+  to a change, or press Save for niri in the editor, and the kept layout lands
+  in a file niri's config includes; Vernier never edits `config.kdl` itself.
+  `vnr layout export` also speaks sway, kanshi, shikane and home-manager.
 - **Mirroring on COSMIC**, through COSMIC's own protocol extension.
 
 ## Usage
@@ -56,7 +58,8 @@ vnr output set HDMI-A-1 --mirror eDP-1    # COSMIC only
 vnr output set eDP-1 --off --dry-run      # plan it and ask the compositor; change nothing
 vnr profile save ~/.config/vernier/desk.toml
 vnr profile apply ~/.config/vernier/desk.toml --yes
-vnr layout export --to niri --write ~/.config/niri/vernier.kdl
+vnr output set eDP-1 --scale 1.5 --persist ~/.config/niri/vernier.kdl
+vnr layout export --to kanshi --write ~/.config/kanshi/config
 ```
 
 On a terminal `vnr` prints tables and asks before keeping a change. Piped, or

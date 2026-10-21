@@ -161,7 +161,7 @@ pub enum ProfileVerb {
 /// Verbs of `vnr layout`.
 #[derive(Debug, Subcommand)]
 pub enum LayoutVerb {
-    /// Print or write the layout as niri or sway configuration.
+    /// Print or write the layout as niri, sway, kanshi, shikane or home-manager configuration.
     Export(ExportArgs),
 }
 
@@ -330,6 +330,11 @@ pub struct SetArgs {
     #[arg(long, default_value_t = 15, value_parser = clap::value_parser!(u64).range(1..=600))]
     #[schemars(default = "default_timeout", range(min = 1, max = 600))]
     pub timeout: u64,
+    /// Once the change is kept, write niri `output` blocks for the whole layout
+    /// to this file, which niri's config includes; never niri's `config.kdl`.
+    #[arg(long, value_name = "FILE")]
+    #[schemars(with = "Option<String>", length(min = 1, max = 4096))]
+    pub persist: Option<PathBuf>,
 }
 
 /// Arguments of `vnr profile save`.
@@ -351,6 +356,11 @@ pub struct ApplyArgs {
     #[arg(long, default_value_t = 15, value_parser = clap::value_parser!(u64).range(1..=600))]
     #[schemars(default = "default_timeout", range(min = 1, max = 600))]
     pub timeout: u64,
+    /// Once the change is kept, write niri `output` blocks for the whole layout
+    /// to this file, which niri's config includes; never niri's `config.kdl`.
+    #[arg(long, value_name = "FILE")]
+    #[schemars(with = "Option<String>", length(min = 1, max = 4096))]
+    pub persist: Option<PathBuf>,
 }
 
 /// Configuration languages, for the schema.
@@ -360,6 +370,10 @@ pub struct ApplyArgs {
 enum ExportName {
     Niri,
     Sway,
+    Kanshi,
+    Shikane,
+    #[schemars(rename = "home-manager")]
+    HomeManager,
 }
 
 /// Arguments of `vnr layout export`.

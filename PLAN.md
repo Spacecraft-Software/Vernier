@@ -54,9 +54,9 @@ MVP: M0–M7 — Vernier v1.0
 
 ## M5 — Release hardening
 
-- [ ] P-025 CI: fmt, clippy `-D warnings`, tests, `cargo audit`, `cargo deny`
-- [ ] P-026 Persist through the compositor: write niri `output` blocks to an included file on request
-- [ ] P-027 Export to shikane, kanshi and a home-manager snippet (optional)
+- [x] P-025 CI: fmt, clippy `-D warnings`, tests, `cargo audit`, `cargo deny` (`deny.toml`)
+- [x] P-026 Persist through the compositor: write niri `output` blocks to an included file on request (`--persist`, editor "Save for niri"; checked with niri 26.04 `validate`)
+- [x] P-027 Export to shikane, kanshi and a home-manager snippet (optional)
 - [ ] P-028 Live screen previews via `ext-image-copy-capture-v1` (optional)
 
 ## M6 — Accessibility and input

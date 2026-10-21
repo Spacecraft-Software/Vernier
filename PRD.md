@@ -47,7 +47,7 @@ The primary user is the maintainer on Steelbore OS Bravais (niri, Nushell) and o
 1. **Dock.** User connects a 4K monitor. Opens `vnr`, drags it right of the laptop, sets scale 1.5, presses Apply, presses Keep. Runs `vnr save desk.toml`.
 2. **Recover.** User picks a mode the monitor cannot display. Every screen goes dark. After 15 seconds Vernier restores the previous layout without any input.
 3. **Present.** User sets HDMI-A-1 to mirror eDP-1 (COSMIC, KDE, GNOME, X11), presents, then turns mirroring off.
-4. **Persist on niri.** User runs `vnr export --format niri` into an included config file so the layout survives a niri restart.
+4. **Persist on niri.** User adds `--persist ~/.config/niri/vernier.kdl` to a change (or presses Save for niri in the editor); once kept, the layout is written to a file niri's config includes, so it survives a niri restart.
 5. **Script.** A Nushell script applies `desk.toml` with `--yes` when a dock is detected.
 
 ## Scope
@@ -108,8 +108,8 @@ Each requirement keeps its identifier for life; a withdrawn one is struck throug
 | R-021 | A profile entry naming make, model and serial shall match that display on any connector. | mandatory | Test | Verified |
 | R-022 | A profile with an unknown key shall be rejected with the key named. | expected | Test | Verified |
 | R-023 | `vnr export` shall print niri and sway configuration equivalent to a layout. | mandatory | Test | Verified |
-| R-024 | On request, Vernier shall write niri `output` blocks to a separate included file, never editing the main config. | expected | Test | Planned |
-| R-025 | `vnr export` shall also produce shikane, kanshi and home-manager formats. | optional | Test | Planned |
+| R-024 | On request, Vernier shall write niri `output` blocks to a separate included file, never editing the main config. | expected | Test | Verified |
+| R-025 | `vnr export` shall also produce shikane, kanshi and home-manager formats. | optional | Test | Verified |
 
 **Interfaces**
 
@@ -185,7 +185,7 @@ vnr [--backend wlr|cosmic|kde|mutter|x11] [--verbose] <command>
           | --left-of|--right-of|--above|--below OUTPUT] [--scale F]
           [--transform T] [--adaptive-sync S] [--mirror OUTPUT | --no-mirror]
           [--primary] [--test] [--yes] [--timeout SECONDS]
-  export  --format niri|sway [--profile PATH]
+  export  --format niri|sway|kanshi|shikane|home-manager [--profile PATH]
 ```
 
 With no command, `vnr` opens the editor. Changes go to standard error; data goes to standard output; exit status is non-zero on any refusal.
@@ -261,7 +261,7 @@ Vernier is Category C under the Steelbore Standard: a bad configuration is visib
 
 - [ ] **Short code.** Is `VNR` the registry short code, matching the binary name?
 - [ ] **Configuration language.** TOML for profiles and settings, or Nickel as for Fairing's themes?
-- [ ] **Persistence on niri.** Should Apply on niri also write the `output` blocks to an included file automatically, or only on an explicit `vnr export`?
+- [x] **Persistence on niri.** Only on request: `--persist FILE` on `output set` and `profile apply`, and Save for niri in the editor (decided 2026-10-21).
 - [ ] **Budgets.** Confirm or change the proposed ceilings in R-110 to R-113.
 - [ ] **Accessibility path.** Wait for AccessKit in iced, or move the editor to a toolkit that has it before 1.0?
 - [ ] **Backend order.** X11 (M2) before KDE (M3) and GNOME (M4), or the other way round?

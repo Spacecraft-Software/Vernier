@@ -140,12 +140,13 @@ impl Roots {
         }
     }
 
-    /// Adds compositor config directories (`niri`, `sway`) under
-    /// `$XDG_CONFIG_HOME`, for `layout export --write`.
+    /// Adds the config directories of the formats `layout export` writes
+    /// (`niri`, `sway`, `kanshi`, `shikane`, `home-manager`) under
+    /// `$XDG_CONFIG_HOME`, for `layout export --write` and `--persist`.
     #[must_use]
     pub fn with_compositor_configs(mut self) -> Self {
         if let Some(config) = xdg("XDG_CONFIG_HOME", ".config") {
-            for name in ["niri", "sway"] {
+            for name in ["niri", "sway", "kanshi", "shikane", "home-manager"] {
                 let dir = config.join(name);
                 self.widened.push(dir.clone());
                 self.roots.push(canonical_dir(&dir));

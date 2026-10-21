@@ -1,6 +1,6 @@
 ---
 name: vernier
-description: Inspect and change display layout (resolution, refresh rate, position, scale, rotation, mirroring, adaptive sync) on Wayland and X11 with the `vnr` command line; save and apply display profiles; export compositor config for niri and sway.
+description: Inspect and change display layout (resolution, refresh rate, position, scale, rotation, mirroring, adaptive sync) on Wayland and X11 with the `vnr` command line; save and apply display profiles; export compositor config for niri, sway, kanshi, shikane and home-manager.
 license: GPL-3.0-or-later
 ---
 
@@ -36,8 +36,10 @@ Trim tokens with `--fields name,mode,x,y,scale` or stream with
 3. Before risky changes, save the current layout so it can be restored:
    `vnr profile save ./before.toml` then `vnr profile apply ./before.toml --yes`.
 4. Changes over wlr-output-management are lost when the compositor restarts;
-   persist them with `vnr layout export --to niri --write ~/.config/niri/vernier.kdl`
-   (only when the user asks for a permanent change).
+   on niri, add `--persist ~/.config/niri/vernier.kdl` to the change (only when
+   the user asks for a permanent change). It never writes `config.kdl` and never
+   replaces a file Vernier did not generate. For sway, kanshi, shikane or
+   home-manager use `vnr layout export --to <format>`.
 
 Running the same `set` or `profile apply` twice is safe: the second run
 reports `"outcome": "unchanged"`.

@@ -4,7 +4,9 @@
 //! Application state, update logic and view.
 
 use std::fmt;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
+use std::{env, fs, io};
 
 use iced::futures::channel::oneshot;
 use iced::keyboard::{self, Key, key::Named};
@@ -16,7 +18,7 @@ use iced::{Border, Element, Font, Length, Subscription, Task, Theme, time};
 use vnr_core::geometry::{normalize, resolve_overlap};
 use vnr_core::{
     AdaptiveSync, BackendKind, Capabilities, Issue, Layout, Mode, Output, Position, Scale,
-    Severity, Transform, validate,
+    Severity, Transform, export, validate,
 };
 
 use crate::Options;
@@ -130,6 +132,10 @@ pub enum Message {
     Reverted(Result<(), String>),
     /// One second passed while a confirmation is pending.
     Tick,
+    /// Write the applied layout to niri's included `vernier.kdl`.
+    SaveNiri,
+    /// The niri include file was written, or why not.
+    SavedNiri(Result<PathBuf, String>),
     /// Re-read the configuration from the display server.
     Reload,
     /// Discard edits.
@@ -180,6 +186,44 @@ fn load(backend: Option<BackendKind>) -> Result<Loaded, String> {
         caps: backend.capabilities(),
         layout,
     })
+}
+
+/// Where "Save for niri" writes: `vernier.kdl` next to niri's config.
+fn niri_include_path() -> Option<PathBuf> {
+    let config = env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .or_else(|| env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))?;
+    Some(config.join("niri").join(export::NIRI_INCLUDE_FILE))
+}
+
+/// Writes `layout` as niri `output` blocks to `path`, replacing only a file
+/// Vernier generated earlier, never one a person wrote.
+fn save_niri(path: &Path, layout: &Layout) -> Result<(), String> {
+    if fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
+        return Err(format!(
+            "{} is a symbolic link; Save for niri writes only regular files",
+            path.display()
+        ));
+    }
+    match fs::read_to_string(path) {
+        Ok(existing) if !export::is_generated(&existing) => {
+            return Err(format!(
+                "{} was not written by Vernier; move it aside first",
+                path.display()
+            ));
+        }
+        Err(e) if e.kind() != io::ErrorKind::NotFound => {
+            return Err(format!("cannot read {}: {e}", path.display()));
+        }
+        _ => {}
+    }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("cannot create {}: {e}", parent.display()))?;
+    }
+    fs::write(path, export::niri(layout))
+        .map_err(|e| format!("cannot write {}: {e}", path.display()))
 }
 
 fn apply(backend: Option<BackendKind>, desired: &Layout) -> Result<(), String> {
@@ -314,6 +358,21 @@ impl App {
         self.issues.iter().any(|i| i.severity() == Severity::Error)
     }
 
+    /// Whether the session is wlr-based (niri included) and forgets
+    /// changes on restart, so saving the niri include file helps.
+    fn offers_niri_save(&self) -> bool {
+        self.kind == Some(BackendKind::Wlr) && !self.caps.persistent && !self.options.demo
+    }
+
+    /// "Save for niri" writes what is on screen, so only with no edits
+    /// waiting and no change waiting for keep-or-revert.
+    fn can_save_niri(&self) -> bool {
+        self.offers_niri_save()
+            && self.busy.is_none()
+            && self.pending.is_none()
+            && self.draft == self.applied
+    }
+
     fn can_apply(&self) -> bool {
         self.busy.is_none()
             && self.pending.is_none()
@@ -369,7 +428,7 @@ impl App {
                     self.status = if self.caps.persistent || self.options.demo {
                         "Kept.".to_owned()
                     } else {
-                        "Kept until the compositor restarts. Run `vnr layout export --to niri --write` to make it permanent."
+                        "Kept until the compositor restarts. Save for niri to make it permanent."
                             .to_owned()
                     };
                 }
@@ -391,6 +450,8 @@ impl App {
                     }
                 }
             }
+            Message::SaveNiri => return self.start_save_niri(),
+            Message::SavedNiri(result) => self.finish_save_niri(result),
             Message::Reload => {
                 if self.busy.is_none() && self.pending.is_none() {
                     self.busy = Some("Reading displays");
@@ -549,6 +610,34 @@ impl App {
                 Task::none()
             }
         }
+    }
+
+    fn start_save_niri(&mut self) -> Task<Message> {
+        if !self.can_save_niri() {
+            return Task::none();
+        }
+        let Some(path) = niri_include_path() else {
+            "Cannot find the config directory: HOME is not set.".clone_into(&mut self.status);
+            return Task::none();
+        };
+        self.busy = Some("Saving");
+        let layout = self.applied.clone();
+        Task::perform(
+            background(move || save_niri(&path, &layout).map(|()| path)),
+            Message::SavedNiri,
+        )
+    }
+
+    fn finish_save_niri(&mut self, result: Result<PathBuf, String>) {
+        self.busy = None;
+        self.status = match result {
+            Ok(path) => format!(
+                "Saved to {}. niri loads it through `include \"{}\"` in config.kdl.",
+                path.display(),
+                export::NIRI_INCLUDE_FILE
+            ),
+            Err(error) => format!("Not saved: {error}"),
+        };
     }
 
     fn start_revert(&mut self) -> Task<Message> {
@@ -806,6 +895,11 @@ impl App {
                     .on_press_maybe((idle && edited).then_some(Message::Reset)),
                 button("Apply").on_press_maybe(self.can_apply().then_some(Message::Apply)),
             ]
+            .push(self.offers_niri_save().then(|| {
+                button("Save for niri")
+                    .style(button::secondary)
+                    .on_press_maybe(self.can_save_niri().then_some(Message::SaveNiri))
+            }))
             .spacing(12)
             .align_y(iced::Alignment::Center),
         )
@@ -977,6 +1071,44 @@ mod tests {
         let _ = app.update(Message::Select(0));
         let _ = app.update(Message::SetScale(Scale::ONE));
         assert!(app.overlapping.is_empty(), "{:?}", app.issues);
+    }
+
+    #[test]
+    fn save_niri_replaces_only_its_own_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("niri").join(export::NIRI_INCLUDE_FILE);
+        let layout = demo_layout();
+        save_niri(&path, &layout).unwrap();
+        let first = fs::read_to_string(&path).unwrap();
+        assert!(export::is_generated(&first));
+        save_niri(&path, &layout).unwrap();
+
+        fs::write(&path, "output \"eDP-1\" { off; }\n").unwrap();
+        assert!(save_niri(&path, &layout).is_err());
+
+        // A symlink, even to a generated file, is never followed.
+        let target = dir.path().join("elsewhere.kdl");
+        fs::write(&target, &first).unwrap();
+        let link = dir.path().join("niri").join("link.kdl");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        assert!(save_niri(&link, &layout).is_err());
+        assert_eq!(fs::read_to_string(&target).unwrap(), first);
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "output \"eDP-1\" { off; }\n"
+        );
+    }
+
+    #[test]
+    fn demo_never_offers_niri_save() {
+        let mut app = demo_app();
+        app.kind = Some(BackendKind::Wlr);
+        assert!(!app.offers_niri_save());
+        app.options.demo = false;
+        assert!(app.can_save_niri());
+        let _ = app.update(Message::Select(0));
+        let _ = app.update(Message::SetScale(Scale::ONE));
+        assert!(!app.can_save_niri(), "unapplied edits are not saved");
     }
 
     #[test]

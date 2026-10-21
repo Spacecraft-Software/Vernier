@@ -9,6 +9,14 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 - CI (GitHub Actions): fmt, clippy and tests; a minimum-Rust (1.88) build;
   and each backend's end-to-end test against a real headless server (sway,
   the Xorg dummy driver, KWin, Mutter) via `scripts/test-servers.sh`.
+- Supply-chain checks in CI: `cargo deny check` (licenses, sources, bans,
+  advisories; policy in `deny.toml`) and `cargo audit`.
+- `--persist FILE` on `output set` and `profile apply`: once the change is
+  kept, write niri `output` blocks to a file niri's config includes. Refuses
+  niri's `config.kdl` and any file Vernier did not generate, before anything
+  on screen changes. The editor gains Save for niri on wlr sessions.
+- `layout export --to kanshi|shikane|home-manager`, and `--write` may target
+  `~/.config/kanshi`, `~/.config/shikane` and `~/.config/home-manager`.
 
 - Core layout model, geometry, validation, TOML profiles, niri and sway export.
 - wlr-output-management backend with the COSMIC extension (mirroring,
