@@ -323,7 +323,7 @@ mod tests {
         assert_eq!(fields, ["position", "scale"]);
         assert_eq!(changes[1].from.as_deref(), Some("1"));
         assert_eq!(changes[1].to.as_deref(), Some("1.5"));
-        assert!(diff(&before, &before).is_empty());
+        assert_eq!(diff(&before, &before), []);
     }
 
     #[test]

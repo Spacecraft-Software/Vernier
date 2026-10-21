@@ -264,7 +264,7 @@ fn fields_restricts_and_rejects_unknown_fields() {
     let bad = sandbox.run(&["output", "list", "--fields", "nonsense"]);
     assert_eq!(bad.code, 2);
     assert_eq!(bad.error()["code"], "INVALID_ARGUMENT");
-    assert!(bad.stdout.is_empty());
+    assert_eq!(bad.stdout, "");
 }
 
 #[test]

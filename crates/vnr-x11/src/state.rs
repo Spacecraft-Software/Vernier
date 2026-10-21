@@ -691,7 +691,7 @@ mod tests {
         assert_eq!(p.screen, None);
         assert_eq!(p.configure.len(), 2);
         // eDP-1 at 2560..4480 fits the unchanged 4480 x 1440 screen.
-        assert!(p.disable.is_empty());
+        assert_eq!(p.disable, []);
     }
 
     #[test]
@@ -702,7 +702,7 @@ mod tests {
         let p = plan(&s, &layout).unwrap();
         assert_eq!(p.disable, [0x11]);
         assert_eq!(p.screen.map(|(px, _)| px), Some((1920, 1080)));
-        assert!(p.configure.is_empty());
+        assert_eq!(p.configure, []);
     }
 
     #[test]
