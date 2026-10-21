@@ -476,7 +476,7 @@ fn change(
 }
 
 /// Checks a `--persist` file: inside the allowed roots, not niri's main
-/// config, and either absent or a file Vernier generated.
+/// config, not a symlink, and either absent or a file Vernier generated.
 fn persist_target(out: &Out, requested: &Path) -> Result<PathBuf, AppError> {
     let roots = Roots::standard().with_compositor_configs();
     note_widened(out, &roots);
@@ -487,6 +487,17 @@ fn persist_target(out: &Out, requested: &Path) -> Result<PathBuf, AppError> {
             ErrorCode::InvalidArgument,
             "`--persist` never writes niri's main config; give it a file the config includes",
             format!("vnr layout export --to niri --write {}", include.display()),
+        ));
+    }
+    // A symlink would carry the write outside the allowed directories.
+    if fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink()) {
+        return Err(AppError::new(
+            ErrorCode::Conflict,
+            format!(
+                "`{}` is a symbolic link; `--persist` writes only regular files",
+                path.display()
+            ),
+            format!("ls -l {}", path.display()),
         ));
     }
     match fs::read_to_string(&path) {

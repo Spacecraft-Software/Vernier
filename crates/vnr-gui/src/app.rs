@@ -200,6 +200,12 @@ fn niri_include_path() -> Option<PathBuf> {
 /// Writes `layout` as niri `output` blocks to `path`, replacing only a file
 /// Vernier generated earlier, never one a person wrote.
 fn save_niri(path: &Path, layout: &Layout) -> Result<(), String> {
+    if fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
+        return Err(format!(
+            "{} is a symbolic link; Save for niri writes only regular files",
+            path.display()
+        ));
+    }
     match fs::read_to_string(path) {
         Ok(existing) if !export::is_generated(&existing) => {
             return Err(format!(
@@ -1079,6 +1085,14 @@ mod tests {
 
         fs::write(&path, "output \"eDP-1\" { off; }\n").unwrap();
         assert!(save_niri(&path, &layout).is_err());
+
+        // A symlink, even to a generated file, is never followed.
+        let target = dir.path().join("elsewhere.kdl");
+        fs::write(&target, &first).unwrap();
+        let link = dir.path().join("niri").join("link.kdl");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        assert!(save_niri(&link, &layout).is_err());
+        assert_eq!(fs::read_to_string(&target).unwrap(), first);
         assert_eq!(
             fs::read_to_string(&path).unwrap(),
             "output \"eDP-1\" { off; }\n"
