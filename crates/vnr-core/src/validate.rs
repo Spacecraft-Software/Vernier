@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn side_by_side_is_clean() {
         let layout = Layout::new(vec![output("A", 0), output("B", 1920)]);
-        assert!(validate(&layout, &Capabilities::default()).is_empty());
+        assert_eq!(validate(&layout, &Capabilities::default()), []);
     }
 
     #[test]

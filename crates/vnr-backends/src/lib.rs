@@ -191,7 +191,10 @@ mod tests {
             ..Session::default()
         };
         assert_eq!(session.candidates(), [BackendKind::X11]);
-        assert!(Session::default().candidates().is_empty());
+        assert_eq!(
+            Session::default().candidates(),
+            [] as [vnr_core::BackendKind; 0]
+        );
     }
 
     #[test]

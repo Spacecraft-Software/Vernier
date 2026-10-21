@@ -85,7 +85,34 @@ impl WlrBackend {
     /// Returns [`BackendError::is_unavailable`] if there is no Wayland
     /// session or the compositor does not implement wlr-output-management.
     pub fn connect() -> Result<Self, BackendError> {
-        let conn = Connection::connect_to_env().map_err(|e| no_session(&e))?;
+        Self::connect_to(None)
+    }
+
+    /// Connects to the named Wayland socket in `XDG_RUNTIME_DIR` (or an
+    /// absolute socket path), or to `WAYLAND_DISPLAY` when `None`.
+    ///
+    /// # Errors
+    ///
+    /// As [`WlrBackend::connect`].
+    pub fn connect_to(display: Option<&str>) -> Result<Self, BackendError> {
+        let conn = match display {
+            None => Connection::connect_to_env().map_err(|e| no_session(&e))?,
+            Some(name) => {
+                let path = std::path::Path::new(name);
+                let path = if path.is_absolute() {
+                    path.to_path_buf()
+                } else {
+                    std::env::var_os("XDG_RUNTIME_DIR")
+                        .map(std::path::PathBuf::from)
+                        .ok_or_else(|| BackendError::unavailable("XDG_RUNTIME_DIR is not set"))?
+                        .join(name)
+                };
+                let stream = std::os::unix::net::UnixStream::connect(&path).map_err(|e| {
+                    BackendError::unavailable(format!("cannot reach `{}`: {e}", path.display()))
+                })?;
+                Connection::from_socket(stream).map_err(|e| no_session(&e))?
+            }
+        };
         let (globals, queue) = registry_queue_init::<State>(&conn)
             .map_err(|e| BackendError::protocol(format!("Wayland registry failed: {e}")))?;
         let qh = queue.handle();

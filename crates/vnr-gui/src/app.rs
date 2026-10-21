@@ -935,7 +935,10 @@ mod tests {
 
     #[test]
     fn demo_layout_is_valid() {
-        assert!(validate(&demo_layout(), &demo_capabilities()).is_empty());
+        assert_eq!(
+            validate(&demo_layout(), &demo_capabilities()),
+            [] as [vnr_core::Issue; 0]
+        );
     }
 
     #[test]

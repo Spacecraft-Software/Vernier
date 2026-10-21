@@ -34,31 +34,14 @@ cargo run -p vnr -- gui --demo        # editor on a sample layout, no display ch
 ```
 
 CLI tests (`crates/vnr/tests/cli.rs`) run the real binary against the fixture
-backend, so they need no display server. Headless end-to-end testing: run
-sway with `WLR_BACKENDS=headless`, add outputs with `swaymsg create_output`,
-then point `WAYLAND_DISPLAY` at it. The X11 backend has a real-server test
-using the Xorg dummy driver (16 virtual outputs with genuine CRTCs):
+backend, so they need no display server. Each display backend also has an
+end-to-end test against a real headless server (sway, the Xorg dummy driver,
+`KWin`, Mutter), ignored by default. One script starts the server in a
+private `XDG_RUNTIME_DIR`, runs the test and stops it; CI runs all four:
 
 ```nushell
-Xorg :5 -noreset -nolisten tcp -config crates/vnr-x11/tests/dummy.conf
-VNR_X11_TEST_DISPLAY=:5 cargo test -p vnr-x11 -- --include-ignored
-```
-
-The KDE backend has one against a headless `KWin` with two virtual outputs
-(on hosts where `kwin_wayland` carries file capabilities a container cannot
-grant, run a copy of the binary):
-
-```nushell
-with-env { QT_QPA_PLATFORM: offscreen } { kwin_wayland --virtual --width 1920 --height 1080 --output-count 2 --socket kwin-test }
-VNR_KDE_TEST_DISPLAY=kwin-test cargo test -p vnr-kde -- --include-ignored
-```
-
-The GNOME backend has one against a headless Mutter on a private bus:
-
-```nushell
-let bus = (dbus-daemon --session --fork --print-address=1 | lines | first)
-with-env { DBUS_SESSION_BUS_ADDRESS: $bus } { mutter --headless --wayland --no-x11 --wayland-display mutter-test --virtual-monitor 1920x1080 --virtual-monitor 1920x1080 }
-VNR_MUTTER_TEST_BUS=$bus cargo test -p vnr-mutter -- --include-ignored
+sh scripts/test-servers.sh sway        # or kwin, mutter
+with-env { SUDO: sudo } { sh scripts/test-servers.sh xorg }   # Xorg needs root
 ```
 
 Changes land through a pull request that is squash-merged on GitHub, which
