@@ -41,6 +41,10 @@ Pre-release (0.1.0). Milestone progress is tracked in [`PLAN.md`](PLAN.md).
   in a file niri's config includes; Vernier never edits `config.kdl` itself.
   `vnr layout export` also speaks sway, kanshi, shikane and home-manager.
 - **Mirroring on COSMIC**, through COSMIC's own protocol extension.
+- **Screens that say which they are.** While the editor is open, each screen
+  shows its output name in a corner, and the selected output's label is
+  outlined, as in wdisplays. Labels never take a click; they need
+  layer-shell (niri, sway, COSMIC, KDE), so GNOME and X11 go without.
 
 ## Usage
 
@@ -102,6 +106,7 @@ times larger.
 
 ```nickel
 {
+  overlays = true,   # label each screen with its output name
   keys = {
     left = ["Left", "a"],
     right = ["Right", "d"],

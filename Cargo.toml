@@ -54,6 +54,9 @@ zbus = "5.19.0"
 x11rb = { version = "0.13.2", default-features = false, features = ["randr"] }
 toml = "1.1.8"
 wayland-client = "0.31.15"
+smithay-client-toolkit = { version = "0.20.0", default-features = false, features = ["calloop"] }
+cosmic-text = "0.15.0"
+tiny-skia = { version = "0.11.4", default-features = false, features = ["std", "simd"] }
 wayland-protocols-wlr = { version = "0.3.12", features = ["client"] }
 wayland-scanner = "0.31"
 

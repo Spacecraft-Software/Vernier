@@ -19,6 +19,9 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
   (Nickel, checked against a contract so errors name the field and line),
   and `vnr config check` to validate it. A broken file never stops the
   editor: it opens with the defaults and says why. New crate `vnr-config`.
+- Screen labels: while the editor is open, each screen shows its output
+  name through layer-shell, the selected one outlined; clicks pass through.
+  `overlays = false` in `config.ncl` turns them off.
 - Minimum Rust is now 1.90, which Nickel and its `malachite` dependency require.
 - `layout export --to kanshi|shikane|home-manager`, and `--write` may target
   `~/.config/kanshi`, `~/.config/shikane` and `~/.config/home-manager`.

@@ -22,7 +22,7 @@ and ARandR (X11). Spacecraft Software project; maintainer Mohamed Hammad.
 | `crates/vnr-backends` | Run-time detection, `open()`, and the `fixture` backend (`VNR_FIXTURE=<file.json>`). |
 | `crates/vnr-config` | The Nickel configuration file (`config.ncl`) and the editor's key map; toolkit-independent. |
 | `crates/vnr-theme` | Steelbore tokens and §11.6 theme resolution, shared by CLI colors and the editor. `assets/steelbore.toml` is the canonical palette, never edited by hand. |
-| `crates/vnr-gui` | iced editor. |
+| `crates/vnr-gui` | iced editor. `overlay.rs` draws the screen labels on its own thread and Wayland connection (layer-shell, `cosmic-text`, `tiny-skia`). |
 | `crates/vnr` | The `vnr` binary: CLI Standard v1.1 grammar, output modes, errors, schema. |
 
 ## Commands

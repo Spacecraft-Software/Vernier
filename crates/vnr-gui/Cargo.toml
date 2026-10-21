@@ -23,6 +23,10 @@ vnr-theme.workspace = true
 vnr-backends.workspace = true
 vnr-core.workspace = true
 vnr-config.workspace = true
+smithay-client-toolkit.workspace = true
+cosmic-text.workspace = true
+tiny-skia.workspace = true
+wayland-client.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

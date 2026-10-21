@@ -5,10 +5,11 @@
 //!
 //! The file lives at `$XDG_CONFIG_HOME/vernier/config.ncl` and is
 //! optional: without it every setting has its default. It evaluates to a
-//! record; today it holds key bindings:
+//! record of key bindings and the screen-label switch:
 //!
 //! ```nickel
 //! {
+//!   overlays = false,
 //!   keys = {
 //!     apply = ["Ctrl+Enter", "Ctrl+s"],
 //!     left = ["Left", "a"],
@@ -46,10 +47,21 @@ pub use keys::{Action, Chord, Key, KeyMap};
 pub const FILE_NAME: &str = "config.ncl";
 
 /// The settings the configuration file controls.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     /// Key bindings for the editor.
     pub keys: KeyMap,
+    /// Label each screen with its output name while the editor is open.
+    pub overlays: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            keys: KeyMap::default(),
+            overlays: true,
+        }
+    }
 }
 
 /// The file's shape before validation.
@@ -58,6 +70,8 @@ pub struct Config {
 struct Raw {
     #[serde(default)]
     keys: BTreeMap<String, Vec<String>>,
+    #[serde(default)]
+    overlays: Option<bool>,
 }
 
 impl Config {
@@ -93,14 +107,17 @@ impl Config {
     fn from_raw(raw: &Raw) -> Result<Self, Vec<String>> {
         let keys =
             KeyMap::with_overrides(raw.keys.iter().map(|(k, v)| (k.as_str(), v.as_slice())))?;
-        Ok(Self { keys })
+        Ok(Self {
+            keys,
+            overlays: raw.overlays.unwrap_or(true),
+        })
     }
 }
 
 /// The file's contract, merged into it so that Nickel reports a wrong type
 /// with the field and the line it is on. Unknown fields are left to serde,
 /// which names the expected ones.
-const CONTRACT: &str = "{ keys | { _ : Array String } | optional }";
+const CONTRACT: &str = "{ keys | { _ : Array String } | optional, overlays | Bool | optional }";
 
 /// Evaluates the file, checked against [`CONTRACT`], and reads the result.
 fn evaluate(path: &Path) -> Result<Raw, EvalOrDeserError> {
@@ -247,6 +264,14 @@ mod tests {
         assert_eq!(config.keys.action(&a), Some(Action::Left));
         assert_eq!(config.keys.chords(Action::Keep), &[] as &[Chord]);
         assert_eq!(config.keys.chords(Action::Apply).len(), 1);
+    }
+
+    #[test]
+    fn overlays_default_on_and_can_be_turned_off() {
+        assert!(load("{}").unwrap().overlays);
+        assert!(!load("{ overlays = false }").unwrap().overlays);
+        let error = load("{ overlays = \"no\" }").unwrap_err();
+        assert!(error.to_string().contains("overlays"), "{error}");
     }
 
     #[test]

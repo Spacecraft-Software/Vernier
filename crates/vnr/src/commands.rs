@@ -193,6 +193,7 @@ fn config_check(out: &Out, args: &CheckArgs) -> Result<(), AppError> {
     let report = ConfigReport {
         source: if path.is_some() { "file" } else { "defaults" }.to_owned(),
         path: path.map(|p| p.display().to_string()),
+        overlays: config.overlays,
         keys: config
             .keys
             .iter()
