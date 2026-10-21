@@ -710,6 +710,47 @@ fn persist_never_replaces_a_file_vernier_did_not_write() {
     );
 }
 
+#[test]
+fn config_check_reports_defaults_overrides_and_problems() {
+    let sandbox = Sandbox::new();
+    let defaults = sandbox.run(&["config", "check", "--json"]);
+    assert_eq!(defaults.code, 0, "{}", defaults.stderr);
+    let data = &defaults.json()["data"];
+    assert_eq!(data["source"], "defaults");
+    assert_eq!(data["keys"][0]["action"], "apply");
+    assert_eq!(data["keys"][0]["keys"][0], "Ctrl+Enter");
+
+    let dir = sandbox.path().join("config/vernier");
+    fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("config.ncl");
+    fs::write(
+        &file,
+        "let mine = [\"a\"] in { keys = { left = mine, keep = [] } }\n",
+    )
+    .unwrap();
+    let custom = sandbox.run(&["config", "check", "--json"]);
+    assert_eq!(custom.code, 0, "{}", custom.stderr);
+    let data = &custom.json()["data"];
+    assert_eq!(data["source"], "file");
+    let keys = data["keys"].as_array().unwrap();
+    let find = |name: &str| keys.iter().find(|k| k["action"] == name).unwrap()["keys"].clone();
+    assert_eq!(find("left"), serde_json::json!(["a"]));
+    assert_eq!(find("keep"), serde_json::json!([]));
+
+    fs::write(&file, "{ keys = { next = [\"h\"], left = \"x\" } }\n").unwrap();
+    let bad = sandbox.run(&["config", "check", file.to_str().unwrap(), "--json"]);
+    assert_eq!(bad.code, 2, "{}", bad.stdout);
+    let error = bad.error();
+    assert_eq!(error["code"], "INVALID_ARGUMENT");
+    assert!(
+        error["message"].as_str().unwrap().contains("left"),
+        "{error}"
+    );
+
+    let missing = sandbox.run(&["config", "check", "nope.ncl", "--json"]);
+    assert_eq!(missing.error()["code"], "NOT_FOUND", "{}", missing.stderr);
+}
+
 // --- Introspection --------------------------------------------------------
 
 #[test]

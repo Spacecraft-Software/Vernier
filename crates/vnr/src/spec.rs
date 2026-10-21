@@ -14,12 +14,14 @@ use schemars::{Schema, schema_for};
 use serde_json::{Map, Value, json};
 
 use crate::cli::{
-    ApplyArgs, Cli, ExportArgs, GetArgs, Global, GuiArgs, NoArgs, SaveArgs, SchemaArgs, SetArgs,
+    ApplyArgs, CheckArgs, Cli, ExportArgs, GetArgs, Global, GuiArgs, NoArgs, SaveArgs, SchemaArgs,
+    SetArgs,
 };
 use crate::error::ErrorCode;
 use crate::output::Response;
 use crate::records::{
-    ApplyReport, BackendRecord, ExportRecord, OutputRecord, VersionRecord, WriteReport,
+    ApplyReport, BackendRecord, ConfigReport, ExportRecord, OutputRecord, VersionRecord,
+    WriteReport,
 };
 
 /// Project page (Steelbore Standard §15).
@@ -51,7 +53,7 @@ pub const GLOBAL_FLAGS: [&str; 15] = [
 ];
 
 /// Diagnostic codes `vnr` emits besides errors.
-pub const DIAGNOSTICS: [(&str, &str, &str); 9] = [
+pub const DIAGNOSTICS: [(&str, &str, &str); 10] = [
     ("APPLIED", "ok", "a configuration was applied"),
     (
         "KEPT",
@@ -64,6 +66,11 @@ pub const DIAGNOSTICS: [(&str, &str, &str); 9] = [
         "LAYOUT_WARNING",
         "warn",
         "the layout has a warning, such as an overlap",
+    ),
+    (
+        "CONFIG_INVALID",
+        "warn",
+        "the configuration file could not be used; defaults apply",
     ),
     (
         "NOT_PERSISTENT",
@@ -137,7 +144,7 @@ const CHANGE_ERRORS: &[ErrorCode] = &[
 ];
 
 /// Every leaf command.
-pub const SPECS: [Spec; 10] = [
+pub const SPECS: [Spec; 11] = [
     Spec {
         path: "gui",
         examples: &[
@@ -337,6 +344,31 @@ pub const SPECS: [Spec; 10] = [
         lists: false,
         parameters: || schema_for!(NoArgs),
         data: || schema_for!(BackendRecord),
+    },
+    Spec {
+        path: "config check",
+        examples: &[
+            (
+                "vnr config check",
+                "Validate ~/.config/vernier/config.ncl and list the key bindings",
+            ),
+            (
+                "vnr config check ./config.ncl --json",
+                "Check a draft before installing it, as JSON",
+            ),
+        ],
+        errors: &[
+            ErrorCode::InvalidArgument,
+            ErrorCode::NotFound,
+            ErrorCode::PermissionDenied,
+        ],
+        supports_json: true,
+        supports_dry_run: false,
+        idempotent: true,
+        destructive: false,
+        lists: false,
+        parameters: || schema_for!(CheckArgs),
+        data: || schema_for!(ConfigReport),
     },
     Spec {
         path: "schema",

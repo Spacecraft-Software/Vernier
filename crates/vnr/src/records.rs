@@ -280,6 +280,27 @@ pub struct WriteReport {
     pub bytes: usize,
 }
 
+/// What `config check` prints.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ConfigReport {
+    /// The file read, after resolving `.` and `..`; absent when none exists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    /// `file` when the file was used, `defaults` when there is none.
+    pub source: String,
+    /// Every editor action and the keys bound to it.
+    pub keys: Vec<BindingRecord>,
+}
+
+/// One editor action and its keys.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct BindingRecord {
+    /// The action's name in the configuration file, e.g. `apply`.
+    pub action: String,
+    /// Its key chords, e.g. `Ctrl+Enter`; empty when unbound.
+    pub keys: Vec<String>,
+}
+
 /// What `layout export` prints when it does not write a file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ExportRecord {

@@ -61,8 +61,8 @@ MVP: M0–M7 — Vernier v1.0
 
 ## M6 — Accessibility and input
 
-- [ ] P-029 Accessible names and roles in the editor (AccessKit, once iced supports it)
-- [ ] P-030 Remappable key bindings from `~/.config/vernier/config.toml`
+- [ ] P-029 Accessible names and roles in the editor (AccessKit, once upstream iced supports it; decided 2026-10-21 to wait rather than move to the pop-os fork)
+- [x] P-030 Remappable key bindings from `~/.config/vernier/config.ncl` (Nickel; `vnr config check`)
 - [ ] P-031 Screen-name overlays via layer-shell, as in wdisplays (optional)
 
 ## M7 — Packaging and documentation

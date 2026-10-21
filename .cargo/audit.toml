@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# cargo audit settings; keep the ignore list in step with deny.toml.
+
+[advisories]
+# imbl-sized-chunks 0.1.3 via nickel-lang-vector 0.2.0: see deny.toml.
+ignore = ["RUSTSEC-2026-0292"]

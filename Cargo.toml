@@ -10,6 +10,7 @@ members = [
     "crates/vnr-mutter",
     "crates/vnr-x11",
     "crates/vnr-theme",
+    "crates/vnr-config",
     "crates/vnr-backends",
     "crates/vnr-gui",
     "crates/vnr",
@@ -18,7 +19,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.90"
 license = "GPL-3.0-or-later"
 authors = ["Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>"]
 repository = "https://github.com/Spacecraft-Software/Vernier"
@@ -36,6 +37,7 @@ vnr-x11 = { path = "crates/vnr-x11", version = "0.1.0" }
 vnr-backends = { path = "crates/vnr-backends", version = "0.1.0" }
 vnr-gui = { path = "crates/vnr-gui", version = "0.1.0" }
 vnr-theme = { path = "crates/vnr-theme", version = "0.1.0" }
+vnr-config = { path = "crates/vnr-config", version = "0.1.0" }
 
 anyhow = "1.0.104"
 csv = "1.4.0"
@@ -44,6 +46,7 @@ schemars = "1.2.3"
 serde_norway = "0.9.42"
 bitflags = "2.13.2"
 clap = { version = "4.6.7", features = ["derive", "env"] }
+nickel-lang-core = { version = "0.19.0", default-features = false }
 iced = { version = "0.14.0", features = ["canvas", "tokio"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["preserve_order"] }

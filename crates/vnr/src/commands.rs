@@ -23,14 +23,14 @@ use vnr_core::{
 };
 
 use crate::cli::{
-    ApplyArgs, BackendVerb, Command, ExportArgs, GetArgs, Global, GuiArgs, LayoutVerb, OutputVerb,
-    ProfileVerb, SaveArgs, SchemaArgs, SetArgs,
+    ApplyArgs, BackendVerb, CheckArgs, Command, ConfigVerb, ExportArgs, GetArgs, Global, GuiArgs,
+    LayoutVerb, OutputVerb, ProfileVerb, SaveArgs, SchemaArgs, SetArgs,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::output::{Mode, Out, Severity};
 use crate::records::{
-    ApplyReport, BackendRecord, ExportRecord, IssueRecord, OutputRecord, VersionRecord,
-    WriteReport, diff,
+    ApplyReport, BackendRecord, BindingRecord, ConfigReport, ExportRecord, IssueRecord,
+    OutputRecord, VersionRecord, WriteReport, diff,
 };
 use crate::spec;
 use crate::validate::Roots;
@@ -65,6 +65,9 @@ pub fn run(out: &Out, global: &Global, command: Option<Command>) -> Result<(), A
         Some(Command::Backend {
             verb: BackendVerb::Get(_),
         }) => backend_get(out, backend),
+        Some(Command::Config {
+            verb: ConfigVerb::Check(args),
+        }) => config_check(out, &args),
         Some(Command::Schema(args)) => schema(out, &args),
         Some(Command::Describe(_)) => describe(out),
     }
@@ -125,12 +128,28 @@ fn gui(out: &Out, global: &Global, args: &GuiArgs) -> Result<(), AppError> {
     for line in vnr_theme::resolve(&request).report().lines() {
         out.diag(Severity::Info, "RESOLVED", line, None);
     }
+    // A broken configuration file must not keep the editor from opening:
+    // warn, and start with the default key bindings.
+    let (config, config_problem) = match vnr_config::Config::load_default() {
+        Ok((config, _)) => (config, None),
+        Err(e) => {
+            out.diag(
+                Severity::Warn,
+                "CONFIG_INVALID",
+                &format!("{e}; using the default key bindings"),
+                Some(&format!("vnr config check {}", e.path().display())),
+            );
+            (vnr_config::Config::default(), Some(e.to_string()))
+        }
+    };
     vnr_gui::run(vnr_gui::Options {
         backend: global.backend,
         theme: args.theme.clone(),
         accessible,
         demo: args.demo,
         verbose: false,
+        config,
+        config_problem,
     })
     .map_err(|e| {
         AppError::new(
@@ -138,6 +157,65 @@ fn gui(out: &Out, global: &Global, args: &GuiArgs) -> Result<(), AppError> {
             crate::error::lower_first(&e.to_string()),
             "vnr gui --demo",
         )
+    })
+}
+
+fn config_check(out: &Out, args: &CheckArgs) -> Result<(), AppError> {
+    let requested = match &args.path {
+        Some(path) => Some(path.clone()),
+        None => vnr_config::default_path().filter(|p| p.is_file()),
+    };
+    let (config, path) = match requested {
+        None => (vnr_config::Config::default(), None),
+        Some(requested) => {
+            let roots = Roots::standard();
+            note_widened(out, &roots);
+            let path = roots.check(&requested)?;
+            let config = vnr_config::Config::load(&path).map_err(|e| {
+                if e.is_missing() {
+                    AppError::new(
+                        ErrorCode::NotFound,
+                        format!("`{}` does not exist", path.display()),
+                        "vnr config check",
+                    )
+                } else {
+                    AppError::new(
+                        ErrorCode::InvalidArgument,
+                        crate::error::lower_first(&e.to_string()),
+                        "vnr schema config check",
+                    )
+                    .with("problems", e.problems())
+                }
+            })?;
+            (config, Some(path))
+        }
+    };
+    let report = ConfigReport {
+        source: if path.is_some() { "file" } else { "defaults" }.to_owned(),
+        path: path.map(|p| p.display().to_string()),
+        keys: config
+            .keys
+            .iter()
+            .map(|(action, chords)| BindingRecord {
+                action: action.to_string(),
+                keys: chords.iter().map(ToString::to_string).collect(),
+            })
+            .collect(),
+    };
+    out.emit(&report, |out| {
+        let rows: Vec<Vec<String>> = report
+            .keys
+            .iter()
+            .map(|b| {
+                let keys = if b.keys.is_empty() {
+                    "(unbound)".to_owned()
+                } else {
+                    b.keys.join("  ")
+                };
+                vec![b.action.clone(), keys]
+            })
+            .collect();
+        crate::output::table(out, &["ACTION", "KEYS"], &rows)
     })
 }
 

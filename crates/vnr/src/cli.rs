@@ -132,6 +132,12 @@ pub enum Command {
         #[command(subcommand)]
         verb: BackendVerb,
     },
+    /// Check the configuration file.
+    Config {
+        /// Verb.
+        #[command(subcommand)]
+        verb: ConfigVerb,
+    },
     /// Print the JSON Schema of every command, a noun, or one command.
     Schema(SchemaArgs),
     /// Print the capability manifest: commands, flags and formats.
@@ -170,6 +176,21 @@ pub enum LayoutVerb {
 pub enum BackendVerb {
     /// Show which backend is in use and what it can do.
     Get(NoArgs),
+}
+
+/// Verbs of `vnr config`.
+#[derive(Debug, Subcommand)]
+pub enum ConfigVerb {
+    /// Validate the configuration file and show the key bindings in effect.
+    Check(CheckArgs),
+}
+
+/// Arguments of `vnr config check`.
+#[derive(Debug, Default, Args, JsonSchema)]
+pub struct CheckArgs {
+    /// The file to check; default `~/.config/vernier/config.ncl`.
+    #[schemars(with = "Option<String>", length(min = 1, max = 4096))]
+    pub path: Option<PathBuf>,
 }
 
 /// A command without arguments of its own.
