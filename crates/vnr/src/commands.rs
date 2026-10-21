@@ -216,7 +216,11 @@ fn config_check(out: &Out, args: &CheckArgs) -> Result<(), AppError> {
                 vec![b.action.clone(), keys]
             })
             .collect();
-        crate::output::table(out, &["ACTION", "KEYS"], &rows)
+        format!(
+            "Screen labels: {}\n\n{}",
+            if report.overlays { "on" } else { "off" },
+            crate::output::table(out, &["ACTION", "KEYS"], &rows)
+        )
     })
 }
 
