@@ -151,16 +151,24 @@ impl Env {
         self.agent || self.ci
     }
 
+    /// Whether `TERM` is `dumb`, so the cursor cannot be moved.
+    #[must_use]
+    pub fn term_dumb(&self) -> bool {
+        self.term_dumb
+    }
+
     /// Whether stdout is a terminal.
     #[must_use]
     pub fn stdout_tty(&self) -> bool {
         self.stdout_tty
     }
 
-    /// Whether a person can answer a prompt: stdin and stderr-side terminal.
+    /// Whether a person can answer a prompt: stdin and stdout are terminals.
     #[must_use]
     pub fn interactive(&self) -> bool {
-        self.stdin_tty && self.stdout_tty && !self.term_dumb
+        // A dumb terminal can still answer y or n; it only cannot move the
+        // cursor, which the countdown checks for itself.
+        self.stdin_tty && self.stdout_tty
     }
 }
 

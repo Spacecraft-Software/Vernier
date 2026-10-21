@@ -37,6 +37,9 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
   `KWin` versions, which send newer events, work; outputs announced through
   `kde_output_device_registry_v2` are read; mirroring works from Plasma 6.3.
 - A missing `libwayland-client.so` is reported by name, with how to fix it.
+- The command line's keep-or-revert prompt counts down in place, as the
+  editor's already did; it stays static in accessible mode and on dumb
+  terminals, which now get the prompt instead of skipping it.
 - Backend detection tries the desktop's own protocol first, then wlr,
   then KWin's.
 - CSV output always has the same columns, even when an optional value is

@@ -9,11 +9,11 @@
 
 use std::fmt::Write as _;
 use std::fs;
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use vnr_core::geometry::{normalize, resolve_overlap};
@@ -526,18 +526,31 @@ fn emit_report(out: &Out, report: &ApplyReport) -> Result<(), AppError> {
     })
 }
 
+/// What the keep prompt says before the countdown number.
+const KEEP_TAG: &str = "[WARN]";
+const KEEP_LEAD: &str = "keep this configuration? [y/N] (reverting in ";
+
 /// Asks on the terminal whether to keep the change; anything but `y`,
 /// including silence until `timeout`, means no.
+///
+/// The seconds count down in place where the terminal can move the cursor,
+/// except in accessible mode, where a screen reader would re-read the line
+/// every second.
 fn confirm_keep(out: &Out, timeout: Duration) -> bool {
+    let seconds = timeout.as_secs();
+    let width = seconds.to_string().len();
+    let animate = io::stderr().is_terminal()
+        && !out.env.term_dumb()
+        && !vnr_theme::resolve(&vnr_theme::Request::default()).accessible;
     let mut stderr = io::stderr().lock();
     let _ = write!(
         stderr,
-        "{} keep this configuration? [y/N] (reverting in {} s): ",
-        out.tint("[WARN]", |p| p.warning, true),
-        timeout.as_secs()
+        "{} {KEEP_LEAD}{seconds:>width$} s): ",
+        out.tint(KEEP_TAG, |p| p.warning, true),
     );
     let _ = stderr.flush();
     drop(stderr);
+
     let (sender, receiver) = mpsc::channel();
     // Reading stdin has no timeout of its own, so it runs on a detached
     // thread; if the deadline passes the process exits with the thread
@@ -547,12 +560,55 @@ fn confirm_keep(out: &Out, timeout: Duration) -> bool {
         let answer = io::stdin().lock().read_line(&mut line).map(|_| line);
         let _ = sender.send(answer);
     });
-    if let Ok(Ok(line)) = receiver.recv_timeout(timeout) {
-        matches!(line.trim(), "y" | "Y" | "yes" | "Yes" | "YES")
-    } else {
-        let _ = writeln!(io::stderr());
-        false
+
+    let column = KEEP_TAG.chars().count() + 1 + KEEP_LEAD.chars().count();
+    let deadline = Instant::now() + timeout;
+    let mut shown = seconds;
+    loop {
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            break;
+        }
+        let wait = if animate {
+            left.min(Duration::from_secs(1))
+        } else {
+            left
+        };
+        match receiver.recv_timeout(wait) {
+            Ok(Ok(line)) => {
+                // End of input (Ctrl-D) echoes no newline; Enter does.
+                if line.is_empty() {
+                    let _ = writeln!(io::stderr());
+                }
+                return matches!(line.trim(), "y" | "Y" | "yes" | "Yes" | "YES");
+            }
+            Ok(Err(_)) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                let now = whole_seconds(deadline.saturating_duration_since(Instant::now()));
+                if animate && now != shown {
+                    shown = now;
+                    let mut stderr = io::stderr().lock();
+                    let _ = write!(stderr, "{}", countdown(column, width, now));
+                    let _ = stderr.flush();
+                }
+            }
+        }
     }
+    let _ = writeln!(io::stderr());
+    false
+}
+
+/// Seconds left, rounded to the nearest whole second.
+fn whole_seconds(left: Duration) -> u64 {
+    (left.as_millis() + 500)
+        .checked_div(1000)
+        .map_or(0, |s| u64::try_from(s).unwrap_or(u64::MAX))
+}
+
+/// Rewrites the countdown number in place: save the cursor (where the user
+/// may be typing), jump to the number's column, write it, restore.
+fn countdown(column: usize, width: usize, seconds: u64) -> String {
+    format!("\x1b7\r\x1b[{column}C{seconds:>width$}\x1b8")
 }
 
 fn profile_save(out: &Out, global: &Global, args: &SaveArgs) -> Result<(), AppError> {
@@ -860,6 +916,14 @@ mod tests {
             }) => set,
             other => panic!("expected output set, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn countdown_rewrites_only_the_number() {
+        assert_eq!(countdown(52, 2, 9), "\x1b7\r\x1b[52C 9\x1b8");
+        assert_eq!(whole_seconds(Duration::from_millis(13_600)), 14);
+        assert_eq!(whole_seconds(Duration::from_millis(13_400)), 13);
+        assert_eq!(whole_seconds(Duration::ZERO), 0);
     }
 
     #[test]
