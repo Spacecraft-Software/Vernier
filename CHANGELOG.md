@@ -6,7 +6,7 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 
 ### Added
 
-- CI (GitHub Actions): fmt, clippy and tests; a minimum-Rust (1.88) build;
+- CI (GitHub Actions): fmt, clippy and tests; a minimum-Rust (1.90) build;
   and each backend's end-to-end test against a real headless server (sway,
   the Xorg dummy driver, KWin, Mutter) via `scripts/test-servers.sh`.
 - Supply-chain checks in CI: `cargo deny check` (licenses, sources, bans,

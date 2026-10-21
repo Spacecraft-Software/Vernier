@@ -171,7 +171,6 @@ yet met, with the reason and the milestone that closes it.
 | Date | Clause | Gap | Reason | Closes in |
 |---|---|---|---|---|
 | 2026-10-18 | §18.3 | GUI publishes no accessible names or roles | iced 0.14 has no AccessKit integration; the CLI is the accessible path meanwhile | M6 |
-| 2026-10-18 | §10 | Key bindings are not yet user-remappable | Bindings are fixed in code until the config file lands | M6 |
 | 2026-10-18 | §8 | No Texinfo manual | Interface still changing before 1.0 | M7 |
 | 2026-10-18 | §5.5 | Only the Nix package exists; Guix and PKGBUILD are missing | Pre-release, no tag pushed | M7 |
 | 2026-10-19 | CLI §2 Rule 1 | `--format explore` prints the table instead of an interactive viewer | ratatui viewer not built yet (TODO T-017) | M6 |
