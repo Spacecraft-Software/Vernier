@@ -25,6 +25,7 @@ use vnr_config::{Action, Chord, KeyMap};
 
 use crate::Options;
 use crate::arrangement::{Arrangement, CanvasEvent};
+use crate::overlay::Overlays;
 use crate::theme::{self, Resolution, Steelbore};
 
 /// Seconds the user has to confirm a new configuration before it is
@@ -179,6 +180,8 @@ pub enum Message {
 pub struct App {
     options: Options,
     keys: KeyMap,
+    /// Screen labels; `None` in demo mode, when turned off, or without layer-shell.
+    overlays: Option<Overlays>,
     resolution: Resolution,
     theme: Theme,
     kind: Option<BackendKind>,
@@ -275,8 +278,19 @@ impl App {
         if options.verbose {
             eprintln!("{}", resolution.report());
         }
+        let overlays = (options.config.overlays && !options.demo)
+            .then(|| {
+                let tokens = vnr_theme::resolve(&vnr_theme::Request {
+                    theme: options.theme.clone(),
+                    accessible: options.accessible,
+                })
+                .tokens;
+                Overlays::start(tokens)
+            })
+            .flatten();
         let app = Self {
             keys: options.config.keys.clone(),
+            overlays,
             theme: theme::iced_theme(&resolution.tokens),
             resolution,
             kind: None,
@@ -387,6 +401,9 @@ impl App {
     fn select(&mut self, index: Option<usize>) {
         self.selected = index.filter(|i| *i < self.draft.outputs.len());
         self.sync_position_text();
+        if let Some(overlays) = &self.overlays {
+            overlays.select(self.selected_output().map(|o| o.name.as_str()));
+        }
     }
 
     fn has_errors(&self) -> bool {

@@ -67,7 +67,6 @@ KDE and GNOME capabilities are planned from their protocol definitions and will 
 **Out of scope for 1.0**
 
 - Live screen previews inside the canvas (wdisplays' "Show Screen Contents"). Planned as optional work after 1.0.
-- Screen-name overlays on each physical display. Optional in M6.
 - A hotplug daemon, Weston, Mir, and Wayland compositors with no output-management protocol.
 - Custom modelines and EDID overrides.
 
@@ -121,6 +120,7 @@ Each requirement keeps its identifier for life; a withdrawn one is struck throug
 | R-033 | Key bindings shall be remappable from the configuration file. | mandatory | Test | Verified |
 | R-034 | The CLI shall offer `list`, `backend`, `save`, `apply`, `set`, `export` and `gui`; `list` and `backend` shall print JSON on request. | mandatory | Test | Verified |
 | R-035 | `vnr gui --demo` shall run the editor on a sample layout without contacting any display server. | expected | Test | Verified |
+| R-036 | While the editor is open on a compositor with layer-shell, each screen shall show a label with its output name, the selected output's label outlined; `overlays = false` in the configuration file shall turn them off. | optional | Test + demonstration | Verified |
 
 ## Non-functional requirements
 

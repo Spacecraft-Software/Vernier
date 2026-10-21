@@ -193,6 +193,7 @@ fn config_check(out: &Out, args: &CheckArgs) -> Result<(), AppError> {
     let report = ConfigReport {
         source: if path.is_some() { "file" } else { "defaults" }.to_owned(),
         path: path.map(|p| p.display().to_string()),
+        overlays: config.overlays,
         keys: config
             .keys
             .iter()
@@ -215,7 +216,11 @@ fn config_check(out: &Out, args: &CheckArgs) -> Result<(), AppError> {
                 vec![b.action.clone(), keys]
             })
             .collect();
-        crate::output::table(out, &["ACTION", "KEYS"], &rows)
+        format!(
+            "Screen labels: {}\n\n{}",
+            if report.overlays { "on" } else { "off" },
+            crate::output::table(out, &["ACTION", "KEYS"], &rows)
+        )
     })
 }
 

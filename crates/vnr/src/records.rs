@@ -288,6 +288,8 @@ pub struct ConfigReport {
     pub path: Option<String>,
     /// `file` when the file was used, `defaults` when there is none.
     pub source: String,
+    /// Whether the editor labels each screen with its output name.
+    pub overlays: bool,
     /// Every editor action and the keys bound to it.
     pub keys: Vec<BindingRecord>,
 }

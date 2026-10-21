@@ -21,6 +21,7 @@
 
 mod app;
 mod arrangement;
+mod overlay;
 pub mod theme;
 
 use iced::{Font, Size};
