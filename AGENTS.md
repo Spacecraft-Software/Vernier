@@ -156,6 +156,7 @@ Prefix every identifier with `VNR-SRS-` when citing it outside this table.
 | VNR-SRS-133 | Vernier shall state overlaps and other problems in words, never by colour alone. | Standard §18: status is never colour-only. | Standard §18 | mandatory | Inspection | verified |
 | VNR-SRS-134 | The editor shall publish accessible names and roles for every control to screen readers. | Standard §18.3; waits on AccessKit in upstream iced. | Standard §18.3 | mandatory | Demonstration with Orca | baselined |
 | VNR-SRS-135 | Vernier shall write timestamps as ISO 8601 UTC with a `Z` suffix. | Standard §14. | Standard §14 | mandatory | Test | verified |
+
 ## Conventions
 
 - Backends are synchronous and short-lived; callers open one per operation.
