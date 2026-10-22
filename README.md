@@ -10,6 +10,20 @@ Conforms to The Steelbore Standard v2.13 — Category C, tailored — and the
 Spacecraft Software CLI Standard v1.1 (see
 [Tailoring register](#tailoring-register)).
 
+## Needs
+
+Why Vernier exists (Steelbore Standard §20.1). Every requirement in
+[`AGENTS.md`](AGENTS.md#requirements-steelbore-standard-20-category-c) traces
+to one of these or to a clause of the Standard.
+
+| ID | Need |
+|---|---|
+| VNR-NEED-001 | One tool arranges displays on every Linux session the maintainer uses: wlroots compositors (niri first), COSMIC, KDE Plasma, GNOME and X11. |
+| VNR-NEED-002 | No display change leaves the user without a working screen: changes are tested first where the server can, and undone unless confirmed. |
+| VNR-NEED-003 | Vernier speaks each display protocol directly and never parses another program's text output. |
+| VNR-NEED-004 | A layout outlives the session: profiles survive a monitor moving to another port, and transient changes can be made permanent. |
+| VNR-NEED-005 | The command line can do what the editor can and pipes cleanly into Nushell, scripts and coding agents. |
+
 ## Status
 
 Pre-release (0.1.0). Milestone progress is tracked in [`PLAN.md`](PLAN.md).
@@ -122,15 +136,28 @@ and says why in its status line.
 ## Building
 
 ```nushell
-cargo build --release
+cargo build --release --locked
+make info html pdf        # the manual, into doc/build/
 ```
 
-Requires Rust 1.90 or later. The binary links only libc; the Wayland
-protocol code is pure Rust. At run time the editor loads `libwayland-client`,
-`libxkbcommon` and a Vulkan or OpenGL driver if present, and falls back to a
-software renderer otherwise. On Steelbore OS Bravais,
-[`packaging/default.nix`](packaging/default.nix) builds the package and wraps
-the binary with those libraries.
+Requires Rust 1.90 or later; the manual needs Texinfo, and the PDF also TeX.
+The binary links only the C runtime; the Wayland protocol code is pure Rust.
+At run time the editor loads `libwayland-client`, `libxkbcommon` and a Vulkan
+or OpenGL driver if present, and falls back to a software renderer otherwise.
+
+The full reference is the Texinfo manual,
+[`doc/vernier.texi`](doc/vernier.texi): `info vernier` once installed.
+
+Package definitions, each installing `vnr` and the Info manual:
+
+| File | Package manager | Build |
+|---|---|---|
+| [`packaging/default.nix`](packaging/default.nix) | Nix, NixOS, Steelbore OS Bravais | `nix-build -E 'with import <nixpkgs> {}; callPackage ./packaging/default.nix {}'` |
+| [`packaging/guix.scm`](packaging/guix.scm) | GNU Guix | `guix build -f packaging/guix.scm` |
+| [`packaging/PKGBUILD`](packaging/PKGBUILD) | Arch Linux | `makepkg -si` in `packaging/` |
+
+Until the first release they build the checkout they sit in. The Guix crate
+list is generated from `Cargo.lock` by `scripts/guix-crates.py`.
 
 ## Design
 
@@ -175,12 +202,10 @@ yet met, with the reason and the milestone that closes it.
 
 | Date | Clause | Gap | Reason | Closes in |
 |---|---|---|---|---|
-| 2026-10-18 | §18.3 | GUI publishes no accessible names or roles | iced 0.14 has no AccessKit integration; the CLI is the accessible path meanwhile | M6 |
-| 2026-10-18 | §8 | No Texinfo manual | Interface still changing before 1.0 | M7 |
-| 2026-10-18 | §5.5 | Only the Nix package exists; Guix and PKGBUILD are missing | Pre-release, no tag pushed | M7 |
-| 2026-10-19 | CLI §2 Rule 1 | `--format explore` prints the table instead of an interactive viewer | ratatui viewer not built yet (TODO T-017) | M6 |
-| 2026-10-19 | CLI testing | No cross-shell round-trip tests (Nushell, PowerShell, jaq) | Needs those shells in CI (TODO T-018) | M7 |
-| 2026-10-18 | §20 | Requirements live as `PLAN.md` items, not an `AGENTS.md` requirement list | Scope still being settled | M7 |
+| 2026-10-18 | §18.3 | GUI publishes no accessible names or roles | iced 0.14 has no AccessKit integration; the CLI is the accessible path meanwhile | When upstream iced ships AccessKit |
+| 2026-10-18 | §5.5 | Packages build from the checkout, without a release tarball checksum | Pre-release, no tag pushed | First release |
+| 2026-10-19 | CLI §2 Rule 1 | `--format explore` prints the table instead of an interactive viewer | ratatui viewer not built yet | TODO T-017 |
+| 2026-10-19 | CLI testing | No cross-shell round-trip tests (Nushell, PowerShell, jaq) | Needs those shells in CI | TODO T-018 |
 
 ## License
 

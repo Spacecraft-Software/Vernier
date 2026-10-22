@@ -67,7 +67,7 @@ MVP: M0–M7 — Vernier v1.0
 
 ## M7 — Packaging and documentation
 
-- [ ] P-032 Texinfo manual `doc/vernier.texi`
-- [ ] P-033 `packaging/guix.scm` and `packaging/PKGBUILD`
-- [ ] P-034 Verify `packaging/default.nix` builds on Bravais
-- [ ] P-035 Requirement list in `AGENTS.md` (§20, Category C)
+- [x] P-032 Texinfo manual `doc/vernier.texi` (`make info html pdf`, zero warnings)
+- [ ] P-033 `packaging/guix.scm` and `packaging/PKGBUILD` (PKGBUILD built and packaged; guix.scm evaluates in Guix but needs a build on a Guix machine)
+- [ ] P-034 Verify `packaging/default.nix` builds on Bravais (builds with nixpkgs, all 155 tests passing in the sandbox; Bravais itself not yet)
+- [x] P-035 Requirement list in `AGENTS.md` (§20, Category C)

@@ -1,0 +1,104 @@
+/* SPDX-FileCopyrightText: 2026 Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>
+   SPDX-License-Identifier: GPL-3.0-or-later
+
+   Spacecraft Software HTML theme for texi2any output.
+   Apply with:  texi2any --html --no-split --css-include=spacecraft.css FILE.texi
+   Canonical copy: /spacecraft-software/construct/steelbore-color-palette/assets/spacecraft.css
+   — the copies in standard/ and spacecraft-texinfo-document/assets/ are synced
+   derivatives, written by the same generator; keep all three byte-identical. */
+
+/* >>> generated from steelbore.toml — do not edit below this line <<< */
+
+/* Palette: The Steelbore Standard §11 (v2.08).  Typography: §12 (Share Tech Mono / Inconsolata,
+   both OFL).  Values are generated from steelbore.toml — §11.4 requires they be
+   read, never retyped.  Regenerate with .github/generate-palette-css.py.
+
+   Fonts are resolved locally and never fetched (§9.1): an installed copy is
+   used where one exists, and the generic monospace fallback covers the rest.
+   No third-party subresource is requested at render time. */
+
+@font-face {
+  font-family: 'Share Tech Mono';
+  src: local('Share Tech Mono'), local('ShareTechMono-Regular');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inconsolata';
+  src: local('Inconsolata'), local('Inconsolata-Regular');
+  font-display: swap;
+}
+
+:root {
+  --void-navy:      #000027;  /* Void Navy — background */
+  --quantum-blue:   #0E2A47;  /* Quantum Blue — surface */
+  --deep-matrix:    #0B1A12;  /* Deep Matrix — surface-alt */
+  --platinum-mist:  #D9DEE5;  /* Platinum Mist — foreground */
+  --plasma-orange:  #FF5E00;  /* Plasma Orange — accent */
+  --pulse-violet:   #8A6CFF;  /* Pulse Violet — structure, border */
+  --acid-lime:      #B4FF00;  /* Acid Lime — success, focus */
+  --mars-red:       #FF3B3B;  /* Mars Red — error */
+  --plasma-magenta: #E445FF;  /* Plasma Magenta — warning */
+  color-scheme: dark;
+}
+
+/* >>> end generated — hand-authored layout follows <<< */
+
+body {
+  background-color: var(--void-navy);
+  color: var(--platinum-mist);
+  font-family: 'Inconsolata', monospace;
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0 auto;
+  max-width: 50rem;
+  padding: 2rem 1.5rem;
+}
+
+h1, h2, h3, h4, h5, h6,
+.settitle, .shortcontents-heading, .contents-heading {
+  font-family: 'Share Tech Mono', monospace;
+  font-weight: normal;
+  line-height: 1.25;
+}
+
+h1, .titlefont, .settitle           { color: var(--plasma-orange); }
+h2, .chapter, .unnumbered, .appendix { color: var(--plasma-orange); }
+h3, .section                         { color: var(--acid-lime); }
+h4, h5, h6, .subsection, .subsubsection { color: var(--pulse-violet); font-style: italic; }
+
+a:link    { color: var(--pulse-violet); }
+a:visited { color: var(--plasma-orange); }
+a:hover   { color: var(--acid-lime); }
+a:focus-visible { outline: 2px solid var(--acid-lime); outline-offset: 2px; }
+
+code, samp, kbd, tt, pre, .verbatim,
+.example, .smallexample, .lisp {
+  font-family: 'Inconsolata', monospace;
+  color: var(--platinum-mist);
+}
+
+pre.example, pre.verbatim, pre.smallexample, pre.lisp, pre.display {
+  background-color: var(--deep-matrix);  /* surface: code / terminal well */
+  border-left: 3px solid var(--pulse-violet);  /* drawn edge (§11.0.1)    */
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+}
+
+blockquote, .quotation {
+  border-left: 3px solid var(--plasma-orange);
+  margin-left: 0;
+  padding-left: 1rem;
+  color: var(--platinum-mist);
+}
+
+table { border-collapse: collapse; }
+th, td { border: 1px solid var(--pulse-violet); padding: 0.35rem 0.6rem; }
+th { color: var(--acid-lime); font-family: 'Share Tech Mono', monospace; }
+
+/* Definition commands (@deffn etc.) */
+dt { color: var(--acid-lime); }
+dfn, var { color: var(--plasma-orange); font-style: italic; }
+
+hr { border: none; border-top: 1px solid var(--pulse-violet); }

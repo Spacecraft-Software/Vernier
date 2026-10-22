@@ -67,6 +67,28 @@ jobs:
       - run: cargo deny --locked check
       - run: cargo audit
 
+  docs-packaging:
+    name: manual, package definitions
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install texinfo and shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends texinfo shellcheck
+      - name: Build the manual (Info, HTML) with no warnings
+        run: |
+          make info html 2>&1 | tee doc-build.log
+          ! grep -E 'warning|error' doc-build.log
+      - name: Guix crate list matches Cargo.lock
+        run: python3 scripts/guix-crates.py --check
+      - name: Shell scripts in packaging pass shellcheck
+        run: |
+          shellcheck -s bash -e SC2034,SC2154,SC2164 packaging/PKGBUILD
+          shellcheck -s sh packaging/vernier.install
+
   servers:
     name: end to end (${{ matrix.server }})
     runs-on: ubuntu-24.04
