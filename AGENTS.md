@@ -35,7 +35,13 @@ cargo deny --locked check             # licenses, sources, advisories (deny.toml
                                       # advisory ignores live in deny.toml and .cargo/audit.toml
 cargo audit
 cargo run -p vnr -- gui --demo        # editor on a sample layout, no display changes
+make info html pdf                    # the manual (doc/vernier.texi) into doc/build/
+python3 scripts/guix-crates.py        # after every Cargo.lock change; CI checks it
 ```
+
+The Texinfo manual is user documentation: change it in the same pull request
+as any behaviour, option or exit code it describes. It builds with zero
+warnings.
 
 CLI tests (`crates/vnr/tests/cli.rs`) run the real binary against the fixture
 backend, so they need no display server. Each display backend also has an
@@ -70,6 +76,86 @@ signs the merge commit; agents never sign commits themselves.
   `--yes`, and never niri's `config.kdl`.
 - Agent detection is presence-based (`AI_AGENT=claude-code_…` counts).
 
+## Requirements (Steelbore Standard §20, Category C)
+
+The requirement set lives here and nowhere else; `PRD.md` holds the needs
+and scope and points here. Identifiers are permanent: a withdrawn
+requirement keeps its row, struck through, and its number is never reused.
+Needs (`NEED-`) are listed in `README.md`. Status is one of `draft`,
+`baselined`, `implemented`, `verified` or `withdrawn`; only `verified` counts
+toward the PLAN figures, and only for `mandatory` and `expected` rows.
+Prefix every identifier with `VNR-SRS-` when citing it outside this table.
+
+### Model and safety
+
+| ID | Requirement | Rationale | Source | Priority | Method | Status |
+|---|---|---|---|---|---|---|
+| VNR-SRS-001 | Vernier shall represent every output with its name, make, model, serial, modes, enabled state, current mode, position, transform, scale in thousandths, adaptive sync state, mirror source and primary flag. | Every backend and both front ends must share one complete model. | VNR-NEED-001 | mandatory | Test | verified |
+| VNR-SRS-002 | Vernier shall refuse to apply a layout in which no output is enabled. | A layout with no screen cannot be confirmed or reverted by the user. | VNR-NEED-002 | mandatory | Test | verified |
+| VNR-SRS-003 | Vernier shall warn, without blocking, when placed outputs overlap or an output shares no edge with any other. | Such layouts are legal but usually mistakes. | VNR-NEED-002 | expected | Test | verified |
+| VNR-SRS-004 | On every backend whose server can test a configuration, Vernier shall test it before applying it. | A rejected test changes nothing on screen. | VNR-NEED-002 | mandatory | Test (headless sway, Mutter) | verified |
+| VNR-SRS-005 | After every interactive apply, Vernier shall restore the previous configuration unless the user confirms within 15 seconds. | A configuration that blanks every screen must undo itself. | VNR-NEED-002 | mandatory | Test + demonstration | verified |
+| VNR-SRS-006 | When there is no terminal or `--yes` is given, Vernier shall keep an applied change without prompting. | Scripts and agents cannot answer a prompt. | VNR-NEED-005 | mandatory | Test | verified |
+| VNR-SRS-007 | Vernier shall match a requested refresh rate to an advertised mode within 0.5 Hz. | Users type rounded rates such as 144. | VNR-NEED-005 | expected | Test | verified |
+
+### Backends
+
+| ID | Requirement | Rationale | Source | Priority | Method | Status |
+|---|---|---|---|---|---|---|
+| VNR-SRS-010 | Vernier shall read and apply configurations through wlr-output-management versions 1 to 4. | niri, sway and other wlroots compositors speak it. | VNR-NEED-001 | mandatory | Test (headless sway) | verified |
+| VNR-SRS-011 | When `zcosmic_output_manager_v1` is advertised, Vernier shall support mirroring, scale in thousandths, three-state adaptive sync and the Xwayland primary output. | COSMIC extends wlr-output-management with these. | VNR-NEED-001 | mandatory | Demonstration on COSMIC | implemented |
+| VNR-SRS-012 | Vernier shall configure X11 outputs through RandR 1.5 without running `xrandr`. | Text scraping broke ARandR. | VNR-NEED-001, VNR-NEED-003 | mandatory | Test (Xorg dummy driver) | verified |
+| VNR-SRS-013 | Vernier shall configure KDE Plasma 6 through kde-output-management-v2. | KWin does not offer wlr-output-management. | VNR-NEED-001 | mandatory | Test (KWin virtual) + demonstration | verified |
+| VNR-SRS-014 | Vernier shall configure GNOME through `org.gnome.Mutter.DisplayConfig`, using its verify method as the test. | Mutter offers no Wayland output protocol. | VNR-NEED-001 | mandatory | Test (headless Mutter) | verified |
+| VNR-SRS-015 | Vernier shall choose a backend from the session and shall accept `--backend` or `VNR_BACKEND` to override it. | Detection can guess wrong on nested or unusual sessions. | VNR-NEED-001 | mandatory | Test | verified |
+| VNR-SRS-016 | Each backend shall report its capabilities, and the editor shall hide controls the backend cannot apply. | A control that cannot work misleads the user. | VNR-NEED-002 | mandatory | Test | verified |
+| VNR-SRS-017 | The editor shall refresh its view when the server reports an output change made elsewhere. | ARandR went stale while it ran. | VNR-NEED-001 | expected | Demonstration | baselined |
+
+### Profiles and export
+
+| ID | Requirement | Rationale | Source | Priority | Method | Status |
+|---|---|---|---|---|---|---|
+| VNR-SRS-020 | `vnr profile save` shall write the current configuration as a TOML profile, and `vnr profile apply` shall restore it. | Layouts must outlive the session. | VNR-NEED-004 | mandatory | Test | verified |
+| VNR-SRS-021 | A profile entry naming make, model and serial shall match that display on any connector. | Docks renumber connectors. | VNR-NEED-004 | mandatory | Test | verified |
+| VNR-SRS-022 | Vernier shall reject a profile with an unknown key and name the key. | A typo must not silently drop a setting. | VNR-NEED-004 | expected | Test | verified |
+| VNR-SRS-023 | `vnr layout export` shall print niri and sway configuration equivalent to a layout. | Those compositors forget changes on restart. | VNR-NEED-004 | mandatory | Test | verified |
+| VNR-SRS-024 | On request, Vernier shall write niri `output` blocks to a separate included file and shall never write niri's main `config.kdl`. | The user's own config must stay theirs. | VNR-NEED-004 | expected | Test | verified |
+| VNR-SRS-025 | `vnr layout export` shall also produce kanshi, shikane and home-manager configuration. | Hotplug daemons already exist; Vernier feeds them. | VNR-NEED-004 | optional | Test | verified |
+
+### Interfaces
+
+| ID | Requirement | Rationale | Source | Priority | Method | Status |
+|---|---|---|---|---|---|---|
+| VNR-SRS-030 | The editor shall let the user drag outputs, snapping edges within 12 screen pixels, and Shift shall disable snapping. | Aligned edges are almost always intended. | VNR-NEED-001 | mandatory | Demonstration | verified |
+| VNR-SRS-031 | The editor shall set enabled state, mode, scale, rotation, position, mirror source, adaptive sync and primary flag for the selected output. | The editor must be able to express the whole model. | VNR-NEED-001 | mandatory | Test + demonstration | verified |
+| VNR-SRS-032 | The editor shall make every action reachable from the keyboard, with CUA and Vim bindings. | Standard §10; keyboard-only users. | Standard §10 | mandatory | Test | verified |
+| VNR-SRS-033 | The editor shall read remapped key bindings from `config.ncl`. | Standard §10 makes remapping mandatory. | Standard §10 | mandatory | Test | verified |
+| VNR-SRS-034 | The CLI shall offer `output list`, `output get`, `output set`, `profile save`, `profile apply`, `layout export`, `backend get`, `config check`, `gui`, `schema` and `describe`, and every command but `gui` shall print JSON on request. | The command line must match the editor's reach. | VNR-NEED-005 | mandatory | Test | verified |
+| VNR-SRS-035 | `vnr gui --demo` shall run the editor on a sample layout without contacting any display server. | Lets anyone try the editor safely. | VNR-NEED-001 | expected | Test | verified |
+| VNR-SRS-036 | While the editor is open on a compositor with layer-shell, Vernier shall label each screen with its output name and outline the selected output's label, unless `overlays = false` is set. | Matches the screen to its rectangle, as wdisplays does. | VNR-NEED-001 | optional | Test + demonstration | verified |
+| VNR-SRS-037 | `vnr config check` shall validate `config.ncl` and report every problem it finds with the field it concerns. | A broken config must be fixable without guesswork. | Standard §10 | expected | Test | verified |
+
+### Non-functional
+
+| ID | Requirement | Rationale | Source | Priority | Method | Status |
+|---|---|---|---|---|---|---|
+| VNR-SRS-100 | The workspace shall contain no `unsafe` code. | Standard §3.1: memory safety first. | Standard §3.1 | mandatory | Inspection (compiler lint) | verified |
+| VNR-SRS-101 | No library crate shall panic on a malformed profile, protocol message or EDID block. | Bad input from a server or file must not crash the tool. | Standard §3.1 | mandatory | Test + fuzzing | implemented |
+| VNR-SRS-102 | When a backend call fails, Vernier shall leave the previous configuration in place and report the error. | A failure must never leave a half-applied layout. | VNR-NEED-002 | mandatory | Test | verified |
+| VNR-SRS-103 | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` shall pass. | Lints catch defects before review. | Standard §3.1 | mandatory | CI | verified |
+| VNR-SRS-110 | `vnr output list` shall finish within 100 ms on the reference machine (ThinkPad T490s, two outputs). | Scripts call it often. | Standard §22 | expected | Benchmark | draft |
+| VNR-SRS-111 | The editor shall show its first frame within 500 ms of launch on the reference machine. | A settings tool should feel immediate. | Standard §22 | expected | Benchmark | draft |
+| VNR-SRS-112 | The release binary shall stay under 16 MB. | Bounds dependency growth. | Standard §22 | expected | CI size check | draft |
+| VNR-SRS-113 | The editor shall use under 1 % CPU while idle with no confirmation pending. | It may stay open on a laptop. | Standard §22 | expected | Measurement | draft |
+| VNR-SRS-120 | Vernier shall open no network connection and send no telemetry. | Standard §9 privacy policy. | Standard §9 | mandatory | Inspection | verified |
+| VNR-SRS-121 | `cargo audit` and `cargo deny` shall pass in CI. | Standard §24 dependency qualification. | Standard §3.3, §24 | mandatory | CI | verified |
+| VNR-SRS-122 | The binary shall link only the C runtime (libc, libm, libgcc_s) and shall load Wayland, xkbcommon and GPU libraries at run time. | One binary for every distribution; checked with `ldd` on 2026-10-22. | VNR-NEED-001 | expected | Inspection (`ldd`) | verified |
+| VNR-SRS-130 | Vernier shall take every colour from the named Steelbore theme resolved per Standard §11.6, with Steelbore Modern as the default. | Standard §11. | Standard §11 | mandatory | Test | verified |
+| VNR-SRS-131 | Every one of the 21 registered themes shall resolve to a complete token set. | A missing token would render unreadable text. | Standard §11.6 | mandatory | Test | verified |
+| VNR-SRS-132 | Accessible mode shall follow Standard §18.1 precedence and switch to the high-contrast theme. | Standard §18. | Standard §18.1 | mandatory | Test | verified |
+| VNR-SRS-133 | Vernier shall state overlaps and other problems in words, never by colour alone. | Standard §18: status is never colour-only. | Standard §18 | mandatory | Inspection | verified |
+| VNR-SRS-134 | The editor shall publish accessible names and roles for every control to screen readers. | Standard §18.3; waits on AccessKit in upstream iced. | Standard §18.3 | mandatory | Demonstration with Orca | baselined |
+| VNR-SRS-135 | Vernier shall write timestamps as ISO 8601 UTC with a `Z` suffix. | Standard §14. | Standard §14 | mandatory | Test | verified |
 ## Conventions
 
 - Backends are synchronous and short-lived; callers open one per operation.

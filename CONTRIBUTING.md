@@ -15,8 +15,10 @@ maintainer's discretion. Open an issue before large changes.
   cargo test --workspace --locked
   ```
 
+<!-- REUSE-IgnoreStart -->
 - **Headers.** Every new source file starts with the two-line SPDX header
   (`SPDX-FileCopyrightText` and `SPDX-License-Identifier: GPL-3.0-or-later`).
+<!-- REUSE-IgnoreEnd -->
 - **Sign-off.** Add `Signed-off-by:` to each commit (Developer Certificate of
   Origin), and sign commits cryptographically.
 - **License.** Contributions are accepted under GPL-3.0-or-later.

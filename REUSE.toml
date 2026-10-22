@@ -19,3 +19,8 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 path = "crates/vnr-kde/protocols/*.xml"
 SPDX-FileCopyrightText = "KDE contributors; see each file's copyright block"
 SPDX-License-Identifier = "MIT-CMU"
+
+[[annotations]]
+path = "crates/vnr-gui/tests/fonts/Inconsolata-Regular.ttf"
+SPDX-FileCopyrightText = "2006 The Inconsolata Project Authors (https://github.com/cyrealtype/Inconsolata)"
+SPDX-License-Identifier = "OFL-1.1"

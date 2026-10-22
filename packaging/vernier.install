@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Registers the Info manual (Steelbore Standard section 8). pacman's own
+# texinfo hook does the same; running install-info twice is harmless.
+
+_info=/usr/share/info/vernier.info
+
+post_install() {
+  if command -v install-info >/dev/null 2>&1; then
+    install-info "$_info" /usr/share/info/dir 2>/dev/null || true
+  fi
+}
+
+post_upgrade() {
+  post_install
+}
+
+pre_remove() {
+  if command -v install-info >/dev/null 2>&1; then
+    install-info --delete "$_info" /usr/share/info/dir 2>/dev/null || true
+  fi
+}

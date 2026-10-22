@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: 2026 Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Arch Linux package for Vernier. From this directory:
+#   makepkg -si
+# Until the first release is tagged this builds the git checkout it sits
+# in; the release switches source=() to the tag's tarball and fills in
+# sha256sums=().
+# Maintainer: Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>
+
+pkgname=vernier
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Arrange, rotate, scale and mirror displays on Wayland and X11'
+arch=('x86_64' 'aarch64')
+url='https://Vernier.SpacecraftSoftware.org/'
+license=('GPL-3.0-or-later')
+depends=('gcc-libs' 'glibc')
+optdepends=(
+  'wayland: the editor on Wayland sessions'
+  'libxkbcommon: keyboard input in the editor'
+  'vulkan-icd-loader: GPU rendering in the editor'
+  'libglvnd: OpenGL rendering in the editor'
+)
+makedepends=('cargo' 'texinfo')
+install=vernier.install
+source=()
+sha256sums=()
+
+_root() {
+  # The repository root, one level above this PKGBUILD.
+  printf '%s\n' "$(cd "$startdir/.." && pwd)"
+}
+
+prepare() {
+  cd "$(_root)"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/^host: //p')"
+}
+
+build() {
+  cd "$(_root)"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR="$srcdir/target"
+  cargo build --frozen --release -p vnr
+  makeinfo --no-split -o "$srcdir/vernier.info" doc/vernier.texi
+}
+
+check() {
+  cd "$(_root)"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR="$srcdir/target"
+  cargo test --frozen --workspace
+}
+
+package() {
+  cd "$(_root)"
+  install -Dm755 "$srcdir/target/release/vnr" "$pkgdir/usr/bin/vnr"
+  install -Dm644 "$srcdir/vernier.info" "$pkgdir/usr/share/info/vernier.info"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

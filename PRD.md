@@ -70,83 +70,9 @@ KDE and GNOME capabilities are planned from their protocol definitions and will 
 - A hotplug daemon, Weston, Mir, and Wayland compositors with no output-management protocol.
 - Custom modelines and EDID overrides.
 
-## Functional requirements
+## Requirements
 
-Each requirement keeps its identifier for life; a withdrawn one is struck through, never renumbered. Priority is mandatory, expected or optional; status is verified only when its test passes in CI or its demonstration is recorded.
-
-**Model and safety**
-
-| ID | Requirement | Priority | Verified by | Status |
-| --- | --- | --- | --- | --- |
-| R-001 | Vernier shall represent every output with its name, identity (make, model, serial), modes, enabled state, mode, position, transform, scale in thousandths, adaptive sync, mirror source and primary flag. | mandatory | Test | Verified |
-| R-002 | Vernier shall refuse to apply a layout in which no output is enabled. | mandatory | Test | Verified |
-| R-003 | Vernier shall warn, without blocking, when placed outputs overlap or an output shares no edge with any other. | expected | Test | Verified |
-| R-004 | Vernier shall ask the server to test a configuration before applying it, on every backend that supports testing. | mandatory | Test | Verified (wlr) |
-| R-005 | After every interactive apply, Vernier shall restore the previous configuration unless the user confirms within 15 seconds. | mandatory | Test + demonstration | Verified (wlr) |
-| R-006 | A non-interactive apply (no terminal, or `--yes`) shall keep the change without prompting. | mandatory | Test | Verified |
-| R-007 | Vernier shall match a requested refresh rate to an advertised mode within 0.5 Hz. | expected | Test | Verified |
-
-**Backends**
-
-| ID | Requirement | Priority | Verified by | Status |
-| --- | --- | --- | --- | --- |
-| R-010 | Vernier shall read and apply configurations through wlr-output-management versions 1 to 4. | mandatory | Test (headless sway) | Verified |
-| R-011 | When `zcosmic_output_manager_v1` is advertised, Vernier shall support mirroring, scale in thousandths, three-state adaptive sync and the Xwayland primary output. | mandatory | Demonstration on COSMIC | Implemented, unverified |
-| R-012 | Vernier shall configure X11 outputs through RandR 1.5 without running `xrandr`. | mandatory | Test (Xvfb) | Planned |
-| R-013 | Vernier shall configure KDE Plasma 6 through kde-output-management-v2. | mandatory | Demonstration | Planned |
-| R-014 | Vernier shall configure GNOME through `org.gnome.Mutter.DisplayConfig`, using the verify method for tests. | mandatory | Demonstration | Planned |
-| R-015 | Vernier shall choose a backend from the session, and accept `--backend` or `VNR_BACKEND` to override it. | mandatory | Test | Verified |
-| R-016 | Each backend shall report its capabilities, and the editor shall hide controls the backend cannot apply. | mandatory | Test | Verified |
-| R-017 | The editor shall refresh its view when the server reports an output change made elsewhere. | expected | Demonstration | Planned |
-
-**Profiles and export**
-
-| ID | Requirement | Priority | Verified by | Status |
-| --- | --- | --- | --- | --- |
-| R-020 | `vnr save` shall write the current configuration as a TOML profile; `vnr apply` shall restore it. | mandatory | Test | Verified |
-| R-021 | A profile entry naming make, model and serial shall match that display on any connector. | mandatory | Test | Verified |
-| R-022 | A profile with an unknown key shall be rejected with the key named. | expected | Test | Verified |
-| R-023 | `vnr export` shall print niri and sway configuration equivalent to a layout. | mandatory | Test | Verified |
-| R-024 | On request, Vernier shall write niri `output` blocks to a separate included file, never editing the main config. | expected | Test | Verified |
-| R-025 | `vnr export` shall also produce shikane, kanshi and home-manager formats. | optional | Test | Verified |
-
-**Interfaces**
-
-| ID | Requirement | Priority | Verified by | Status |
-| --- | --- | --- | --- | --- |
-| R-030 | The editor shall let the user drag outputs, snapping edges within 12 screen pixels; Shift shall disable snapping. | mandatory | Demonstration | Verified |
-| R-031 | The editor shall set enabled, mode, scale, rotation, position, mirror, adaptive sync and primary for the selected output. | mandatory | Test + demonstration | Verified |
-| R-032 | Every editor action shall be reachable from the keyboard, with CUA and Vim bindings. | mandatory | Test | Verified |
-| R-033 | Key bindings shall be remappable from the configuration file. | mandatory | Test | Verified |
-| R-034 | The CLI shall offer `list`, `backend`, `save`, `apply`, `set`, `export` and `gui`; `list` and `backend` shall print JSON on request. | mandatory | Test | Verified |
-| R-035 | `vnr gui --demo` shall run the editor on a sample layout without contacting any display server. | expected | Test | Verified |
-| R-036 | While the editor is open on a compositor with layer-shell, each screen shall show a label with its output name, the selected output's label outlined; `overlays = false` in the configuration file shall turn them off. | optional | Test + demonstration | Verified |
-
-## Non-functional requirements
-
-Stability comes first, then performance, then security (Steelbore Standard §3). The budgets below are proposed ceilings for the maintainer to confirm; the binary size is measured from the 0.1.0 release build.
-
-| ID | Requirement | Priority | Verified by |
-| --- | --- | --- | --- |
-| R-100 | The workspace shall contain no `unsafe` code (`unsafe_code = "forbid"`). | mandatory | Inspection (compiler lint) |
-| R-101 | No library crate shall panic on malformed profiles, protocol messages or EDID data. | mandatory | Test, fuzzing of the profile parser |
-| R-102 | A backend failure shall leave the previous configuration in place and report the error. | mandatory | Test |
-| R-103 | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` shall pass. | mandatory | CI |
-| R-110 | `vnr list` shall finish within 100 ms on the reference machine (ThinkPad T490s, two outputs). | expected | Benchmark in CI |
-| R-111 | The editor shall show its first frame within 500 ms of launch on the reference machine. | expected | Benchmark |
-| R-112 | The release binary shall stay under 16 MB (12.6 MB measured at 0.1.0). | expected | CI size check |
-| R-113 | The editor shall use under 1 % CPU while idle with no confirmation pending. | expected | Measurement |
-| R-120 | Vernier shall open no network connection and send no telemetry. | mandatory | Inspection + `cargo deny` |
-| R-121 | `cargo audit` and `cargo deny` shall pass before each dependency addition and in CI. | mandatory | CI |
-| R-122 | The binary shall link only libc; Wayland, xkbcommon and GPU libraries shall be loaded at run time. | expected | Inspection (`ldd`) |
-| R-130 | Colours shall come only from the named Steelbore theme, resolved per Standard §11.6; Steelbore Modern is the default. | mandatory | Test |
-| R-131 | All 21 registered themes shall resolve to complete token sets. | mandatory | Test |
-| R-132 | Accessible mode shall follow §18.1 precedence and switch to the high-contrast theme. | mandatory | Test |
-| R-133 | Overlap and other problems shall be stated in words, never by colour alone. | mandatory | Inspection |
-| R-134 | The editor shall publish accessible names and roles for every control to screen readers. | mandatory | Demonstration with Orca |
-| R-135 | Timestamps written by Vernier shall be ISO 8601 UTC with a `Z` suffix. | mandatory | Test |
-
-R-134 depends on AccessKit support in iced; until then the CLI is the accessible path, recorded in the tailoring register.
+The requirement set moved to [`AGENTS.md`](AGENTS.md#requirements-steelbore-standard-20-category-c) on 2026-10-22 (Steelbore Standard §20.1, Category C), where coding agents load it. The old `R-NNN` identifiers map one to one: R-020 is now VNR-SRS-020. The needs those requirements trace to are listed in [`README.md`](README.md#needs) as VNR-NEED-001 to 005; the goals above are their source.
 
 ## User experience
 
@@ -247,23 +173,21 @@ Vernier is Category C under the Steelbore Standard: a bad configuration is visib
 - **Unit tests** cover the core model, geometry, validation, profiles, exporters, theme resolution, CLI parsing and editor state (50 tests at 0.1.0).
 - **Headless integration tests** run each backend against a real server: sway with `WLR_BACKENDS=headless` for wlr, Xvfb for X11. CI runs both.
 - **Demonstrations** cover what CI cannot reach: COSMIC, KDE, GNOME and screen-reader use. Each is recorded with date, versions and hardware.
-- **The traceability matrix** maps every R- identifier to its tests and is generated in CI from test names.
+- **The traceability matrix** is planned: it will map every VNR-SRS identifier to its tests, generated in CI.
 
 **Tailoring register**
 
 | Date | Clause | Gap | Closes in |
 | --- | --- | --- | --- |
-| 2026-10-18 | §18.3 | No accessible names or roles in the editor (iced has no AccessKit yet) | M6 |
-| 2026-10-18 | §8 | No Texinfo manual | M7 |
-| 2026-10-18 | §5.5 | Guix and PKGBUILD packages missing; Nix package not yet built on Bravais | M7 |
-| 2026-10-18 | §20 | Requirements kept in this PRD, not yet mirrored in `AGENTS.md` | M7 |
+| 2026-10-18 | §18.3 | No accessible names or roles in the editor (iced has no AccessKit yet) | When upstream iced ships AccessKit |
+| 2026-10-18 | §5.5 | Packages build from the checkout; release tarball and checksums come with the first tag | First release |
 
 ## Open questions
 
-- [ ] **Short code.** Is `VNR` the registry short code, matching the binary name?
+- [x] **Short code.** `VNR`, matching the binary; requirement identifiers are `VNR-SRS-NNN` (decided 2026-10-22).
 - [x] **Configuration language.** Nickel for settings (`config.ncl`), TOML for profiles (decided 2026-10-21).
 - [x] **Persistence on niri.** Only on request: `--persist FILE` on `output set` and `profile apply`, and Save for niri in the editor (decided 2026-10-21).
-- [ ] **Budgets.** Confirm or change the proposed ceilings in R-110 to R-113.
+- [ ] **Budgets.** Confirm or change the proposed ceilings in VNR-SRS-110 to 113. The release binary measured 28.8 MB on 2026-10-22 (Nickel and the screen-label text stack), over the 16 MB draft in VNR-SRS-112.
 - [x] **Accessibility path.** Wait for AccessKit in upstream iced; the CLI stays the accessible path until then (decided 2026-10-21).
 - [ ] **Backend order.** X11 (M2) before KDE (M3) and GNOME (M4), or the other way round?
 - [ ] **Upstream.** Propose the COSMIC mirroring semantics for wlr-output-management upstream, or stay a consumer?

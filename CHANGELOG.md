@@ -22,6 +22,14 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 - Screen labels: while the editor is open, each screen shows its output
   name through layer-shell, the selected one outlined; clicks pass through.
   `overlays = false` in `config.ncl` turns them off.
+- Texinfo manual `doc/vernier.texi` (CC-BY-SA-4.0), built by
+  `make info html pdf`; every package installs it as an Info file.
+- Guix (`packaging/guix.scm`, crate list generated from `Cargo.lock` by
+  `scripts/guix-crates.py`) and Arch (`packaging/PKGBUILD`) packages; all
+  three build the checkout until the first release.
+- Requirements moved from `PRD.md` to `AGENTS.md` as `VNR-SRS-NNN`, with
+  rationale, source, method and status; needs listed in `README.md`.
+- CI builds the manual and checks the Guix crate list and package scripts.
 - Minimum Rust is now 1.90, which Nickel and its `malachite` dependency require.
 - `layout export --to kanshi|shikane|home-manager`, and `--write` may target
   `~/.config/kanshi`, `~/.config/shikane` and `~/.config/home-manager`.

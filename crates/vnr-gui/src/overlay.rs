@@ -90,6 +90,7 @@ impl Overlays {
 }
 
 fn run(tokens: &Steelbore, receiver: channel::Channel<Option<String>>) -> Result<(), String> {
+    let painter = Painter::new(tokens.clone()).ok_or("no fonts are installed")?;
     let conn = Connection::connect_to_env().map_err(|e| e.to_string())?;
     let (globals, queue) = registry_queue_init::<Labels>(&conn).map_err(|e| e.to_string())?;
     let qh = queue.handle();
@@ -118,7 +119,7 @@ fn run(tokens: &Steelbore, receiver: channel::Channel<Option<String>>) -> Result
         layer_shell,
         shm,
         pool,
-        painter: Painter::new(tokens.clone()),
+        painter,
         shown: Vec::new(),
         selected: None,
         stop: event_loop.get_signal(),
@@ -263,12 +264,19 @@ struct Painter {
 }
 
 impl Painter {
-    fn new(tokens: Steelbore) -> Self {
-        Self {
-            fonts: FontSystem::new(),
+    /// A painter over the system's fonts; `None` when none are installed,
+    /// because shaping text without any font panics inside cosmic-text,
+    /// and a panic here would abort the whole editor.
+    fn new(tokens: Steelbore) -> Option<Self> {
+        Self::with_fonts(FontSystem::new(), tokens)
+    }
+
+    fn with_fonts(fonts: FontSystem, tokens: Steelbore) -> Option<Self> {
+        (!fonts.db().is_empty()).then(|| Self {
+            fonts,
             glyphs: SwashCache::new(),
             tokens,
-        }
+        })
     }
 
     /// The label's logical size for these two lines.
@@ -525,10 +533,24 @@ mod tests {
         Rgb::new(p.red(), p.green(), p.blue())
     }
 
+    /// A painter with only the bundled test font, so the result does not
+    /// depend on the fonts of the machine running the tests (build
+    /// sandboxes have none).
+    fn painter(tokens: Steelbore) -> Painter {
+        let mut db = cosmic_text::fontdb::Database::new();
+        db.load_font_data(include_bytes!("../tests/fonts/Inconsolata-Regular.ttf").to_vec());
+        let fonts = FontSystem::new_with_locale_and_db("en-US".to_owned(), db);
+        Painter::with_fonts(fonts, tokens).expect("the test font loads")
+    }
+
+    fn tokens() -> Steelbore {
+        vnr_theme::resolve(&vnr_theme::Request::default()).tokens
+    }
+
     #[test]
     fn a_label_has_a_border_a_fill_and_text() {
-        let tokens = vnr_theme::resolve(&vnr_theme::Request::default()).tokens;
-        let mut painter = Painter::new(tokens.clone());
+        let tokens = tokens();
+        let mut painter = painter(tokens.clone());
         let (w, h) = painter.measure("DP-1", "Dell U2723QE");
         assert!(w > 2 * to_px(PADDING) && h > to_px(NAME_SIZE), "{w}x{h}");
 
@@ -548,13 +570,21 @@ mod tests {
 
     #[test]
     fn doubled_scale_doubles_the_pixels() {
-        let tokens = vnr_theme::resolve(&vnr_theme::Request::default()).tokens;
-        let mut painter = Painter::new(tokens);
+        let mut painter = painter(tokens());
         let (w, h) = painter.measure("eDP-1", "");
         let pixmap = painter
             .render(w * 2, h * 2, 2, false, "eDP-1", "")
             .expect("pixmap");
         assert_eq!((pixmap.width(), pixmap.height()), (w * 2, h * 2));
+    }
+
+    #[test]
+    fn no_fonts_means_no_labels_instead_of_a_panic() {
+        let empty = FontSystem::new_with_locale_and_db(
+            "en-US".to_owned(),
+            cosmic_text::fontdb::Database::new(),
+        );
+        assert!(Painter::with_fonts(empty, tokens()).is_none());
     }
 
     #[test]

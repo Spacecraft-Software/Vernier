@@ -1,0 +1,657 @@
+\input texinfo   @c -*- texinfo -*-
+@c SPDX-FileCopyrightText: 2026 Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>
+@c SPDX-License-Identifier: CC-BY-SA-4.0
+@c
+@c The Vernier manual (Steelbore Standard section 8).  Build with
+@c `make info', `make html' or `make pdf' from the repository root.
+@c %**start of header
+@setfilename vernier.info
+@documentencoding UTF-8
+@documentlanguage en
+@settitle Vernier Manual 0.1.0
+@syncodeindex fn cp
+@c %**end of header
+
+@set VERSION 0.1.0
+@set UPDATED 2026-10-22
+@set SUBDOMAIN https://Vernier.SpacecraftSoftware.org/
+
+@copying
+This manual is for Vernier (@command{vnr}), version @value{VERSION},
+updated @value{UPDATED}.
+
+Copyright @copyright{} 2026 Mohamed Hammad & Spacecraft Software.
+
+@quotation
+This document is licensed under the Creative Commons Attribution-ShareAlike
+4.0 International License (CC-BY-SA-4.0).  To view a copy of this licence,
+visit @url{https://creativecommons.org/licenses/by-sa/4.0/}.
+@end quotation
+@end copying
+
+@dircategory Spacecraft Software
+@direntry
+* Vernier: (vernier).           Arrange, rotate, scale and mirror displays.
+@end direntry
+
+@titlepage
+@title Vernier Manual
+@subtitle Display configuration for Wayland and X11
+@subtitle For version @value{VERSION}, @value{UPDATED}
+@author Mohamed Hammad
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+
+Maintained by Mohamed Hammad
+@email{Mohamed.Hammad@@SpacecraftSoftware.org}.
+@*
+@uref{@value{SUBDOMAIN}}
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Vernier
+
+Vernier arranges, rotates, scales and mirrors displays on Linux.  It
+replaces wdisplays on Wayland and ARandR on X11 with one program that
+has a graphical editor and a scriptable command line.
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Overview::            What Vernier does and how it keeps you safe.
+* Installation::        Packages and building from source.
+* The Editor::          Arranging displays with the mouse and keyboard.
+* Command Line::        The @command{vnr} commands and options.
+* Profiles::            Saving and restoring layouts.
+* Making Changes Permanent::  Persisting layouts for niri and other tools.
+* Configuration File::  Key bindings and screen labels.
+* Backends::            Which display servers Vernier speaks to.
+* Environment::         Environment variables Vernier reads.
+* Exit Status::         Exit codes and error objects.
+* Reporting Bugs::      Where to send problems and questions.
+* Index::               Concepts, commands and variables.
+@end menu
+
+@node Overview
+@chapter Overview
+
+@cindex overview
+Vernier (@command{vnr}) changes the resolution, refresh rate, position,
+scale, rotation, mirroring and adaptive sync of the displays connected
+to a Linux session.  The same model and the same backends serve both
+front ends:
+
+@itemize @bullet
+@item
+@cindex editor
+a graphical @dfn{editor}, where outputs appear as rectangles you drag
+into place (@pxref{The Editor});
+
+@item
+@cindex command line
+a @dfn{command line} that does everything the editor does and prints
+tables on a terminal or JSON when piped (@pxref{Command Line}).
+@end itemize
+
+@cindex confirm or revert
+@cindex revert
+Vernier is built so that no change can leave you without a working
+screen.  Where the display server can test a configuration, Vernier
+tests it before applying it.  After every interactive change Vernier
+asks whether to keep it, and if nobody answers within 15 seconds it
+restores the previous configuration.  A layout that blanks every screen
+therefore undoes itself.
+
+@cindex protocols
+Vernier speaks each display protocol directly.  It never runs
+@command{xrandr}, @command{wlr-randr} or another program and parses its
+output, so unusual mode names cannot confuse it.
+
+@node Installation
+@chapter Installation
+
+@cindex installation
+@cindex packages
+Vernier ships package definitions for three package managers in the
+@file{packaging} directory of its source tree:
+
+@table @file
+@item packaging/default.nix
+Nix and NixOS, including Steelbore OS Bravais.  From a flake:
+@example
+vernier = pkgs.callPackage ./packaging/default.nix @{ @};
+@end example
+
+@item packaging/guix.scm
+GNU Guix.  From the source tree:
+@example
+guix build -f packaging/guix.scm
+@end example
+
+@item packaging/PKGBUILD
+Arch Linux and derivatives.  From the @file{packaging} directory:
+@example
+makepkg -si
+@end example
+@end table
+
+Each package installs the @command{vnr} binary and this manual as an
+Info file.
+
+@cindex building from source
+To build from source you need Rust 1.90 or later:
+
+@example
+cargo build --release --locked
+@end example
+
+@cindex run-time libraries
+The binary links only the C runtime.  At run time the editor loads
+@file{libwayland-client}, @file{libxkbcommon} and a Vulkan or OpenGL
+driver when they are present, and falls back to a software renderer
+otherwise.  The command line needs none of them.
+
+@node The Editor
+@chapter The Editor
+
+@cindex editor
+Run @command{vnr} with no command, or @command{vnr gui}, to open the
+editor.  @command{vnr gui --demo} opens it on a built-in sample layout
+and never touches a real display, which is a safe way to try it.
+
+@menu
+* Arranging::           The canvas and the side panel.
+* Applying::            Apply, keep and revert.
+* Editor Keys::         Default key bindings.
+* Screen Labels::       Output names on each physical screen.
+@end menu
+
+@node Arranging
+@section Arranging outputs
+
+@cindex canvas
+@cindex snapping
+The canvas shows every output as a rectangle at its position and
+logical size.  Drag a rectangle to move the output; its edges snap to
+neighbouring edges within 12 screen pixels.  Hold @key{Shift} while
+dragging to place it freely.
+
+@cindex side panel
+The side panel lists the outputs.  For the selected output it sets the
+enabled state, mode, scale, rotation, position, mirror source, adaptive
+sync and the primary flag.  Controls the backend cannot apply are
+hidden.  Overlaps and outputs that touch no other output are reported in
+words under the canvas; they are warnings and do not block applying.
+
+@node Applying
+@section Apply, keep and revert
+
+@cindex apply
+@cindex keep
+Press @samp{Apply} to send the edited layout.  A bar then counts down
+from 15 seconds with @samp{Keep} and @samp{Revert} buttons.  Keep
+confirms the change; Revert, or letting the countdown reach zero,
+restores the layout from before Apply.
+
+@cindex save for niri
+On wlroots compositors such as niri, a change lasts until the compositor
+restarts.  The @samp{Save for niri} button writes the applied layout to
+@file{~/.config/niri/vernier.kdl}; @pxref{Making Changes Permanent}.
+
+@node Editor Keys
+@section Default key bindings
+
+@cindex key bindings
+Every action has a CUA binding and a Vim binding.  All of them can be
+changed in the configuration file (@pxref{Configuration File}); the
+action names below are the names the file uses.
+
+@multitable @columnfractions .34 .22 .24 .20
+@headitem Action @tab Name @tab CUA @tab Vim
+@item Move the selected output 1 px (10 with @key{Shift})
+@tab @code{left} @code{right} @code{up} @code{down}
+@tab Arrow keys @tab @kbd{h} @kbd{l} @kbd{k} @kbd{j}
+@item Select the next or previous output
+@tab @code{next}, @code{previous}
+@tab @key{PageDown}, @key{PageUp} @tab @kbd{]}, @kbd{[}
+@item Apply @tab @code{apply} @tab @kbd{C-@key{RET}}, @kbd{C-s} @tab
+@item Keep or revert a pending change
+@tab @code{keep}, @code{revert} @tab buttons @tab @kbd{y}, @kbd{n}
+@item Discard edits, or revert a pending change
+@tab @code{discard} @tab @key{ESC} @tab
+@item Reload from the display server
+@tab @code{reload} @tab @key{F5}, @kbd{C-r} @tab
+@end multitable
+
+@key{TAB} moves keyboard focus between controls and cannot be bound.
+Plain letters and arrows act only when no text field has the focus, so
+typing a position never moves an output.
+
+@node Screen Labels
+@section Screen labels
+
+@cindex screen labels
+@cindex overlays
+While the editor is open, each physical screen shows a small label in
+its top-left corner with its output name, make and model, so you can
+tell which rectangle is which screen.  The label of the selected output
+is outlined.  Labels never take a click or a key.
+
+Labels need the layer-shell protocol, which niri, sway, COSMIC and KDE
+Plasma offer.  GNOME and X11 sessions get no labels.  Set
+@code{overlays = false} in the configuration file to turn them off.
+
+@node Command Line
+@chapter Command Line
+
+@cindex grammar
+Commands follow @samp{vnr @var{noun} @var{verb}}.  On a terminal
+@command{vnr} prints tables and asks before keeping a change.  Piped, in
+CI, or under a coding agent it prints JSON and keeps changes without
+asking.
+
+@menu
+* Global Options::      Options every command accepts.
+* Output Commands::     List, inspect and change outputs.
+* Other Commands::      Profiles, export, backend, config, introspection.
+@end menu
+
+@node Global Options
+@section Global options
+
+@table @option
+@item --json
+Same as @samp{--format json}.
+
+@item --format @var{format}
+@cindex output formats
+Output format: @code{json} (one document with @code{metadata} and
+@code{data}), @code{jsonl} (one record per line), @code{yaml},
+@code{csv}, or @code{explore}.  The default is a table on a terminal and
+JSON otherwise.
+
+@item --fields @var{field},@dots{}
+Print only these fields of each record.
+
+@item --dry-run
+Show what would change, and whether the display server accepts it,
+without changing anything.
+
+@item -v
+@itemx --verbose
+Also print informational diagnostics, such as how the theme was chosen.
+
+@item -q
+@itemx --quiet
+Print errors only.
+
+@item --color @var{when}
+@itemx --no-color
+Colour human output @code{auto}, @code{always} or @code{never}.
+
+@item -0
+@itemx --print0
+Print the first field of each record followed by a NUL byte.
+
+@item -y
+@itemx --yes
+Keep changes without asking, overwrite existing files, and allow the
+editor to open under an agent.
+
+@item --backend @var{name}
+Use this backend instead of detecting one (@pxref{Backends}).
+
+@item -V
+@itemx --version
+Print the version, maintainer and project page.
+@end table
+
+@node Output Commands
+@section Output commands
+
+@table @code
+@item vnr output list
+@findex output list
+List the connected outputs and their settings.
+
+@item vnr output get @var{output}
+@findex output get
+Show one output, including every mode it supports.
+
+@item vnr output set @var{output} @var{settings}@dots{}
+@findex output set
+Change one output.  The settings are:
+
+@table @option
+@item --on
+@itemx --off
+Turn the output on or off.
+@item --mode @var{width}x@var{height}[@@@var{rate}]
+Mode, rate in Hz, for example @samp{2560x1440@@144}.  A rate within
+0.5 Hz of an advertised mode selects it.
+@item --preferred
+Use the display's preferred mode.
+@item --pos @var{x},@var{y}
+Absolute position in logical pixels.
+@item --left-of @var{output}
+@itemx --right-of @var{output}
+@itemx --above @var{output}
+@itemx --below @var{output}
+Place next to another output.
+@item --scale @var{factor}
+Scale, at most three decimals, for example @samp{1.25}.
+@item --transform @var{t}
+One of @code{normal}, @code{90}, @code{180}, @code{270}, @code{flipped},
+@code{flipped-90}, @code{flipped-180}, @code{flipped-270}.
+@item --adaptive-sync @var{state}
+@code{disabled}, @code{automatic} or @code{always}.
+@item --mirror @var{output}
+@itemx --no-mirror
+Mirror another output, or stop mirroring.
+@item --primary
+Make this the primary output.
+@item --timeout @var{seconds}
+Seconds to wait for confirmation before reverting; 15 by default.
+@item --persist @var{file}
+Once the change is kept, also write niri @code{output} blocks for the
+whole layout to @var{file} (@pxref{Making Changes Permanent}).
+@end table
+@end table
+
+@example
+vnr output set DP-1 --mode 2560x1440@@144 --right-of eDP-1 --scale 1.25
+vnr output set HDMI-A-1 --mirror eDP-1 --dry-run --json
+@end example
+
+@node Other Commands
+@section Other commands
+
+@table @code
+@item vnr profile save @var{file}
+@findex profile save
+Save the current layout as a profile (@pxref{Profiles}).
+
+@item vnr profile apply @var{file}
+@findex profile apply
+Apply a saved profile, then keep or revert it.  Accepts
+@option{--timeout} and @option{--persist} as @samp{output set} does.
+
+@item vnr layout export --to @var{format}
+@findex layout export
+Print the layout as @code{niri}, @code{sway}, @code{kanshi},
+@code{shikane} or @code{home-manager} configuration.
+@option{--profile @var{file}} exports a profile instead of the current
+layout; @option{--write @var{file}} writes a file instead of printing.
+
+@item vnr backend get
+@findex backend get
+Show which backend is in use and what it can do.
+
+@item vnr config check [@var{file}]
+@findex config check
+Validate the configuration file and list the key bindings in effect
+(@pxref{Configuration File}).
+
+@item vnr schema [@var{noun} [@var{verb}]]
+@findex schema
+Print the JSON Schema of every command, a noun, or one command, ready
+for function calling by a language model.
+
+@item vnr describe
+@findex describe
+Print the capability manifest: commands, flags, formats and exit codes.
+
+@item vnr gui
+@findex gui
+Open the editor.  @option{--demo} uses a sample layout;
+@option{--theme @var{slug}} and @option{--accessible} choose the theme.
+@end table
+
+@cindex allowed paths
+Files are read and written only inside the working directory and
+Vernier's own directories under @file{~/.config}, @file{~/.local/share}
+and @file{~/.cache}; @samp{layout export --write} and
+@option{--persist} may also write inside the niri, sway, kanshi,
+shikane and home-manager configuration directories.  An existing file
+is replaced only with @option{--yes}.
+
+@node Profiles
+@chapter Profiles
+
+@cindex profiles
+A profile is a TOML file with one @code{[[output]]} table per output.
+@samp{vnr profile save} writes one; @samp{vnr profile apply} restores it.
+
+@example
+[[output]]
+name = "DP-3"
+make = "Dell Inc."
+model = "U2720Q"
+serial = "ABC123"
+mode = "3840x2160@@60Hz"
+position = @{ x = 1920, y = 0 @}
+scale = 1.5
+transform = "normal"
+adaptive-sync = "automatic"
+
+[[output]]
+name = "eDP-1"
+mirror = "DP-3"
+@end example
+
+@cindex matching displays
+An entry that names make, model and serial matches that display on any
+connector, so a profile survives a dock that renumbers its ports.
+Fields left out keep the output's current value.  A key Vernier does
+not know is an error that names the key, so a typo never silently drops
+a setting.
+
+@node Making Changes Permanent
+@chapter Making Changes Permanent
+
+@cindex persistence
+@cindex niri
+Changes made through wlr-output-management last until the compositor
+restarts.  For niri, add @option{--persist} to a change:
+
+@example
+vnr output set eDP-1 --scale 1.5 --persist ~/.config/niri/vernier.kdl
+@end example
+
+Once you keep the change, Vernier writes niri @code{output} blocks for
+the whole layout to that file.  Add this line to niri's
+@file{config.kdl} once:
+
+@example
+include "vernier.kdl"
+@end example
+
+@option{--persist} never writes @file{config.kdl} itself, never follows a
+symbolic link, and replaces a file only if Vernier generated it.  It
+checks the file before anything on screen changes.
+
+@cindex kanshi
+@cindex shikane
+@cindex home-manager
+For hotplug daemons, export a profile in their own format:
+
+@example
+vnr layout export --to kanshi --write ~/.config/kanshi/config
+vnr layout export --to shikane
+vnr layout export --to home-manager
+@end example
+
+The home-manager output is a @code{services.kanshi} setting to merge into
+your home-manager configuration.
+
+@node Configuration File
+@chapter Configuration File
+
+@cindex configuration file
+@cindex Nickel
+Vernier reads @file{$XDG_CONFIG_HOME/vernier/config.ncl}
+(@file{~/.config/vernier/config.ncl} by default), written in
+@uref{https://nickel-lang.org/, Nickel}.  The file is optional; without
+it every setting has its default.
+
+@example
+@{
+  overlays = true,
+  keys = @{
+    left = ["Left", "a"],
+    right = ["Right", "d"],
+    keep = ["y", "Enter"],
+  @},
+@}
+@end example
+
+@table @code
+@item overlays
+@code{true} (the default) shows screen labels while the editor is open;
+@code{false} turns them off (@pxref{Screen Labels}).
+
+@item keys
+A record from action names to lists of chords.  Each action listed
+replaces its default bindings, an empty list unbinds it, and actions not
+listed keep their defaults.  The action names are @code{apply},
+@code{reload}, @code{discard}, @code{keep}, @code{revert}, @code{next},
+@code{previous}, @code{left}, @code{right}, @code{up} and @code{down}
+(@pxref{Editor Keys}).
+@end table
+
+@cindex chords
+A chord is a key, optionally preceded by @samp{Ctrl+} and @samp{Alt+}:
+@samp{Ctrl+Enter}, @samp{Alt+F2}, @samp{PageDown}, @samp{]} or
+@samp{h}.  Named keys are @code{Enter}, @code{Escape}, @code{Space},
+@code{Backspace}, @code{Delete}, @code{Insert}, @code{Home}, @code{End},
+@code{PageUp}, @code{PageDown}, @code{Left}, @code{Right}, @code{Up},
+@code{Down} and @code{F1} to @code{F24}.  @key{Shift} cannot be bound,
+because it makes moves ten times larger; @key{TAB} cannot be bound,
+because it moves keyboard focus.  One chord may not belong to two
+actions.
+
+@findex config check
+Run @samp{vnr config check} to validate the file.  Every problem is
+listed, with the field and line it concerns.  If the file has a problem
+when the editor starts, the editor still opens, with the default key
+bindings, and says why in its status line.
+
+@node Backends
+@chapter Backends
+
+@cindex backends
+Vernier picks a backend from the session.  @option{--backend} or
+@env{VNR_BACKEND} overrides it.
+
+@multitable @columnfractions .14 .40 .46
+@headitem Name @tab Sessions @tab Protocol
+@item @code{wlr}
+@tab niri, sway, Hyprland, river, labwc, Wayfire
+@tab wlr-output-management, versions 1 to 4
+@item @code{cosmic}
+@tab COSMIC
+@tab wlr-output-management with COSMIC's extension, which adds
+mirroring, fine scale and the Xwayland primary output
+@item @code{kde}
+@tab KDE Plasma 6
+@tab kde-output-management-v2
+@item @code{mutter}
+@tab GNOME
+@tab @code{org.gnome.Mutter.DisplayConfig} over D-Bus
+@item @code{x11}
+@tab X11 sessions
+@tab RandR 1.5
+@end multitable
+
+@cindex capabilities
+@samp{vnr backend get} shows what the backend in use can do: mirroring,
+adaptive sync, a primary output, custom modes, fractional scale, testing
+before applying, and whether the display server keeps changes across a
+restart by itself.
+
+@node Environment
+@chapter Environment
+
+@cindex environment variables
+@table @env
+@item VNR_BACKEND
+Backend to use instead of detecting one.
+
+@item VNR_ALLOWED_PATHS
+Extra directories, separated as in @env{PATH}, that Vernier may read and
+write.
+
+@item VNR_FIXTURE
+A JSON file to use as a fake display server, for tests.
+
+@item XDG_CONFIG_HOME
+Base directory of @file{vernier/config.ncl} and of the allowed write
+locations; @file{~/.config} when unset.
+
+@item SPACECRAFT_THEME
+Theme slug, for example @code{steelbore} or
+@code{steelbore-navywhite}.  @option{--theme} overrides it.
+
+@item SPACECRAFT_A11Y
+@code{1} turns accessible mode on (high-contrast theme, no animation);
+@code{0} turns it off.
+
+@item NO_COLOR
+@itemx FORCE_COLOR
+Turn colour off, or force it on, as usual.
+
+@item AI_AGENT
+@itemx AGENT
+@itemx CI
+@itemx CLAUDECODE
+When any of these is set, Vernier prints JSON and never prompts.
+@end table
+
+@node Exit Status
+@chapter Exit Status
+
+@cindex exit status
+@cindex errors
+Errors are printed to standard error as one JSON object with a
+@code{code}, a @code{message} and a @code{hint} that is itself a command
+you can run.
+
+@multitable @columnfractions .10 .30 .60
+@headitem Status @tab Code @tab Meaning
+@item 0 @tab @tab Success.
+@item 1 @tab @code{INTERNAL_ERROR} @tab An unexpected failure inside Vernier.
+@item 2 @tab @code{INVALID_ARGUMENT}, @code{MISSING_ARGUMENT} @tab An argument is wrong or missing.
+@item 3 @tab @code{NOT_FOUND} @tab The output, profile or file does not exist.
+@item 4 @tab @code{PERMISSION_DENIED} @tab A path is outside the allowed set, or access was refused.
+@item 5 @tab @code{CONFLICT} @tab The file already exists, or the outputs changed while applying.
+@item 10 @tab @code{BACKEND_UNAVAILABLE} @tab No display server, or it lacks the protocol.
+@item 11 @tab @code{UNSUPPORTED} @tab The backend cannot express the change.
+@item 12 @tab @code{REJECTED} @tab The display server refused the configuration.
+@item 13 @tab @code{PROTOCOL_ERROR} @tab The display server sent something unexpected.
+@item 14 @tab @code{REVERTED} @tab The change was not confirmed and was undone.
+@item 15 @tab @code{INVALID_LAYOUT} @tab The layout has errors and was not sent.
+@item 16 @tab @code{REVERT_FAILED} @tab Restoring the previous configuration failed.
+@end multitable
+
+@node Reporting Bugs
+@chapter Reporting Bugs
+
+@cindex bugs
+Report problems at
+@uref{https://github.com/Spacecraft-Software/Vernier/issues}.  Include
+the output of @samp{vnr --verbose backend get} and the command you ran.
+Security problems go privately to the maintainer, Mohamed Hammad,
+at @email{Mohamed.Hammad@@SpacecraftSoftware.org}, as described in the
+project's @file{SECURITY.md}.
+
+@node Index
+@unnumbered Index
+
+@printindex cp
+
+@bye
