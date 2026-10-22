@@ -81,7 +81,8 @@ jobs:
       - name: Build the manual (Info, HTML) with no warnings
         run: |
           make info html 2>&1 | tee doc-build.log
-          ! grep -E 'warning|error' doc-build.log
+          # texi2any reports problems as `doc/vernier.texi:LINE: ...'.
+          ! grep -E '^doc/[^ ]+\.texi:[0-9]+:' doc-build.log
       - name: Guix crate list matches Cargo.lock
         run: python3 scripts/guix-crates.py --check
       - name: Shell scripts in packaging pass shellcheck

@@ -13,7 +13,7 @@ all: info html pdf
 
 info:
 	mkdir -p $(BUILD)
-	texi2any --info --no-split --error-limit=0 -o $(BUILD)/vernier.info $(SRC)
+	texi2any --info --no-split -o $(BUILD)/vernier.info $(SRC)
 
 html:
 	mkdir -p $(BUILD)
