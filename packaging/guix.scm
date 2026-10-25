@@ -227,9 +227,9 @@
 (define rust-clap-lex-1.1.1
   (crate-source "clap_lex" "1.1.1"
                 "11k4m4ngn39iz39lnq6nn6kyxzp62mnm1d86qfad3q0vlk33n4qw"))
-(define rust-clipboard-win-5.4.1
-  (crate-source "clipboard-win" "5.4.1"
-                "1m44gqy11rq1ww7jls86ppif98v6kv2wkwk8p17is86zsdq3gq5x"))
+(define rust-clipboard-win-5.4.3
+  (crate-source "clipboard-win" "5.4.3"
+                "16isdlcwrj0jgjs5k5c0jvr15mqrs1knlyms2bdcrzk6hj3zfah5"))
 (define rust-clipboard-macos-0.1.1
   (crate-source "clipboard_macos" "0.1.1"
                 "13zkbmnsl2c98452kvia7vr2ywwl123bj2q81diw78vv0jm4lzwv"))
@@ -1713,7 +1713,7 @@
    rust-clap-builder-4.6.7
    rust-clap-derive-4.6.7
    rust-clap-lex-1.1.1
-   rust-clipboard-win-5.4.1
+   rust-clipboard-win-5.4.3
    rust-clipboard-macos-0.1.1
    rust-clipboard-wayland-0.2.2
    rust-clipboard-x11-0.4.3
