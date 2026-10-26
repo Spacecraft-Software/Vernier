@@ -4,6 +4,15 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 
 ## Unreleased
 
+### Fixed
+
+- `vnr gui` names any run-time library it cannot load (`libwayland-client`;
+  `libX11`, `libX11-xcb`, `libXcursor`, `libXi`; `libxkbcommon`) and exits 17, `LIBRARY_MISSING`, with a hint
+  (on NixOS, building the Nix package) instead of an internal error.
+- `vnr gui` with no reachable compositor or X server exits 10,
+  `BACKEND_UNAVAILABLE`, instead of reporting an internal error. A panic now
+  exits with the reported error's code.
+
 ### Added
 
 - CI (GitHub Actions): fmt, clippy and tests; a minimum-Rust (1.90) build;

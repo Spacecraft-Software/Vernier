@@ -142,6 +142,11 @@ fn gui(out: &Out, global: &Global, args: &GuiArgs) -> Result<(), AppError> {
             (vnr_config::Config::default(), Some(e.to_string()))
         }
     };
+    let missing = vnr_gui::missing_libraries();
+    if !missing.is_empty() {
+        let nixos = std::path::Path::new("/etc/NIXOS").exists();
+        return Err(AppError::missing_libraries(&missing, nixos));
+    }
     vnr_gui::run(vnr_gui::Options {
         backend: global.backend,
         theme: args.theme.clone(),

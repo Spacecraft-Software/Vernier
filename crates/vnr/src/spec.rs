@@ -158,7 +158,11 @@ pub const SPECS: [Spec; 11] = [
                 "Open the editor from an agent session; it prints nothing",
             ),
         ],
-        errors: &[ErrorCode::MissingArgument, ErrorCode::BackendUnavailable],
+        errors: &[
+            ErrorCode::MissingArgument,
+            ErrorCode::BackendUnavailable,
+            ErrorCode::LibraryMissing,
+        ],
         supports_json: false,
         supports_dry_run: false,
         idempotent: true,

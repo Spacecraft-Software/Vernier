@@ -151,10 +151,21 @@ cargo build --release --locked
 @end example
 
 @cindex run-time libraries
-The binary links only the C runtime.  At run time the editor loads
-@file{libwayland-client}, @file{libxkbcommon} and a Vulkan or OpenGL
-driver when they are present, and falls back to a software renderer
-otherwise.  The command line needs none of them.
+The binary links only the C runtime.  At run time the editor needs
+@file{libxkbcommon} and, on Wayland, @file{libwayland-client} or, on X11,
+@file{libX11}, @file{libX11-xcb}, @file{libXcursor} and @file{libXi}; it uses a Vulkan or OpenGL driver when one is present and
+falls back to a software renderer otherwise.  The command line needs none
+of them.  If a required library cannot be loaded, @command{vnr gui} names
+it and exits with status 17 (@code{LIBRARY_MISSING}).
+
+On NixOS the libraries are not on the default search path, so a plain
+@command{cargo build} cannot open the editor.  Build the Nix package
+instead; it sets the library path for you:
+
+@example
+nix-build -E 'with import <nixpkgs> @{@}; callPackage ./packaging/default.nix @{@}'
+./result/bin/vnr gui
+@end example
 
 @node The Editor
 @chapter The Editor
@@ -668,6 +679,7 @@ you can run.
 @item 14 @tab @code{REVERTED} @tab The change was not confirmed and was undone.
 @item 15 @tab @code{INVALID_LAYOUT} @tab The layout has errors and was not sent.
 @item 16 @tab @code{REVERT_FAILED} @tab Restoring the previous configuration failed.
+@item 17 @tab @code{LIBRARY_MISSING} @tab The editor cannot load a library it needs.
 @end multitable
 
 @node Reporting Bugs

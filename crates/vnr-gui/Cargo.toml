@@ -29,6 +29,9 @@ tiny-skia.workspace = true
 wayland-client.workspace = true
 wayland-protocols.workspace = true
 wayland-protocols-wlr.workspace = true
+wayland-sys.workspace = true
+xkbcommon-dl.workspace = true
+x11-dl.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
