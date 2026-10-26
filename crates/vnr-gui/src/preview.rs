@@ -317,10 +317,6 @@ struct Capture {
     taken: bool,
     /// A timer will start the next capture.
     waiting: bool,
-    /// Counts the ext session's constraint batches (`done` events).
-    generation: u32,
-    /// The batch the frame in flight was made for.
-    frame_generation: u32,
 }
 
 struct Capturer {
@@ -364,8 +360,6 @@ impl Capturer {
             y_invert: false,
             taken: false,
             waiting: false,
-            generation: 0,
-            frame_generation: 0,
         });
         // An ext session starts at its first `done`; screencopy now.
         if matches!(self.copier, Copier::Wlr(_)) {
@@ -433,7 +427,6 @@ impl Capturer {
                 let (Some(session), Some(buffer)) = (&capture.session, &capture.buffer) else {
                     return;
                 };
-                capture.frame_generation = capture.generation;
                 let frame = session.create_frame(&self.qh, capture.output.clone());
                 frame.attach_buffer(buffer.wl_buffer());
                 frame.damage_buffer(0, 0, w, h);
@@ -722,11 +715,14 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, wl_output::WlOutput> for Capturer {
             }
             E::Done => {
                 let next = std::mem::take(&mut capture.incoming);
-                if next != capture.current {
-                    capture.buffer = None;
-                }
+                let changed = next != capture.current;
                 capture.current = next;
-                capture.generation = capture.generation.wrapping_add(1);
+                if changed {
+                    // A frame in flight was made for the old buffer: drop it
+                    // before the buffer, then capture with the new shape.
+                    state.drop_frame(index);
+                    state.captures[index].buffer = None;
+                }
                 state.capture(index);
             }
             E::Stopped => state.remove(data),
@@ -754,16 +750,11 @@ impl Dispatch<ExtImageCopyCaptureFrameV1, wl_output::WlOutput> for Capturer {
             } => state.captures[index].transform = transform,
             E::Ready => state.ready(index),
             E::Failed { reason } => {
-                let capture = &state.captures[index];
-                let refreshed = capture.generation != capture.frame_generation;
                 state.drop_frame(index);
                 match reason {
-                    // Constraints that arrived while the frame was in flight
-                    // are already in effect: retry with them now. Otherwise
-                    // their `done` is still coming and starts the capture.
-                    WEnum::Value(FailureReason::BufferConstraints) if refreshed => {
-                        state.capture(index);
-                    }
+                    // New constraints follow; their `done` starts the next
+                    // capture. Had they come first, `done` would already
+                    // have dropped this frame and captured again.
                     WEnum::Value(FailureReason::BufferConstraints) => {}
                     WEnum::Value(FailureReason::Stopped) => state.remove(data),
                     _ => state.later(index),

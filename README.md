@@ -128,7 +128,7 @@ times larger.
 ```nickel
 {
   overlays = true,   # label each screen with its output name
-  previews = false,  # start with screen contents shown
+  previews = false,  # true starts the editor with screen contents shown
   keys = {
     left = ["Left", "a"],
     right = ["Right", "d"],
