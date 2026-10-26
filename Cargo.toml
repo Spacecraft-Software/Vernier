@@ -57,6 +57,7 @@ wayland-client = "0.31.15"
 smithay-client-toolkit = { version = "0.20.0", default-features = false, features = ["calloop"] }
 cosmic-text = "0.15.0"
 tiny-skia = { version = "0.11.4", default-features = false, features = ["std", "simd"] }
+wayland-protocols = { version = "0.32.13", features = ["client", "staging"] }
 wayland-protocols-wlr = { version = "0.3.12", features = ["client"] }
 wayland-scanner = "0.31"
 

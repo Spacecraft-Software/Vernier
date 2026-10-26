@@ -123,3 +123,24 @@ jobs:
         env:
           SUDO: ${{ matrix.server == 'xorg' && 'sudo' || '' }}
         run: sh scripts/test-servers.sh ${{ matrix.server }}
+
+  # Ubuntu's sway (1.9) offers only wlr-screencopy; sway from nixpkgs also
+  # offers ext-image-copy-capture-v1, so both capture paths are tested.
+  sway-current:
+    name: end to end (sway from nixpkgs)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: sway-current
+      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+      - name: Run the sway end-to-end tests on sway from nixpkgs
+        run: |
+          nix shell github:NixOS/nixpkgs/d3b13ad75cc492690728f9307e443dec9ef9a20e#sway \
+            --command sh scripts/test-servers.sh sway

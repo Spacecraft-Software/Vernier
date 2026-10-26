@@ -92,6 +92,9 @@ sway)
 	wait_for "Wayland socket" first_socket "$runtime/wayland-*"
 	display=$(basename "$(first_socket "$runtime/wayland-*")")
 	VNR_WLR_TEST_DISPLAY=$display run_test vnr-wlr sway_headless
+	# Screen contents: screencopy everywhere, ext-image-copy-capture-v1
+	# too on sway 1.11 and later.
+	VNR_PREVIEW_TEST_DISPLAY=$display run_test vnr-gui sway_previews
 	;;
 xorg)
 	number=${VNR_XORG_DISPLAY:-99}

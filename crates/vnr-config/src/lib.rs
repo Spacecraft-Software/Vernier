@@ -5,11 +5,13 @@
 //!
 //! The file lives at `$XDG_CONFIG_HOME/vernier/config.ncl` and is
 //! optional: without it every setting has its default. It evaluates to a
-//! record of key bindings and the screen-label switch:
+//! record of key bindings and two switches, for the screen labels and the
+//! screen-content previews:
 //!
 //! ```nickel
 //! {
 //!   overlays = false,
+//!   previews = true,
 //!   keys = {
 //!     apply = ["Ctrl+Enter", "Ctrl+s"],
 //!     left = ["Left", "a"],
@@ -53,6 +55,8 @@ pub struct Config {
     pub keys: KeyMap,
     /// Label each screen with its output name while the editor is open.
     pub overlays: bool,
+    /// Start the editor with each output's screen contents shown.
+    pub previews: bool,
 }
 
 impl Default for Config {
@@ -60,6 +64,7 @@ impl Default for Config {
         Self {
             keys: KeyMap::default(),
             overlays: true,
+            previews: false,
         }
     }
 }
@@ -72,6 +77,8 @@ struct Raw {
     keys: BTreeMap<String, Vec<String>>,
     #[serde(default)]
     overlays: Option<bool>,
+    #[serde(default)]
+    previews: Option<bool>,
 }
 
 impl Config {
@@ -110,6 +117,7 @@ impl Config {
         Ok(Self {
             keys,
             overlays: raw.overlays.unwrap_or(true),
+            previews: raw.previews.unwrap_or(false),
         })
     }
 }
@@ -117,7 +125,8 @@ impl Config {
 /// The file's contract, merged into it so that Nickel reports a wrong type
 /// with the field and the line it is on. Unknown fields are left to serde,
 /// which names the expected ones.
-const CONTRACT: &str = "{ keys | { _ : Array String } | optional, overlays | Bool | optional }";
+const CONTRACT: &str = "{ keys | { _ : Array String } | optional, overlays | Bool | optional, \
+                        previews | Bool | optional }";
 
 /// Evaluates the file, checked against [`CONTRACT`], and reads the result.
 fn evaluate(path: &Path) -> Result<Raw, EvalOrDeserError> {
@@ -264,6 +273,14 @@ mod tests {
         assert_eq!(config.keys.action(&a), Some(Action::Left));
         assert_eq!(config.keys.chords(Action::Keep), &[] as &[Chord]);
         assert_eq!(config.keys.chords(Action::Apply).len(), 1);
+    }
+
+    #[test]
+    fn previews_default_off_and_can_be_turned_on() {
+        assert!(!load("{}").unwrap().previews);
+        assert!(load("{ previews = true }").unwrap().previews);
+        let error = load("{ previews = 1 }").unwrap_err();
+        assert!(error.to_string().contains("previews"), "{error}");
     }
 
     #[test]

@@ -17,7 +17,7 @@ categories.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-iced.workspace = true
+iced = { workspace = true, features = ["image-without-codecs"] }
 serde.workspace = true
 vnr-theme.workspace = true
 vnr-backends.workspace = true
@@ -27,9 +27,13 @@ smithay-client-toolkit.workspace = true
 cosmic-text.workspace = true
 tiny-skia.workspace = true
 wayland-client.workspace = true
+wayland-protocols.workspace = true
+wayland-protocols-wlr.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+vnr-wlr.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

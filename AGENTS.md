@@ -22,7 +22,7 @@ and ARandR (X11). Spacecraft Software project; maintainer Mohamed Hammad.
 | `crates/vnr-backends` | Run-time detection, `open()`, and the `fixture` backend (`VNR_FIXTURE=<file.json>`). |
 | `crates/vnr-config` | The Nickel configuration file (`config.ncl`) and the editor's key map; toolkit-independent. |
 | `crates/vnr-theme` | Steelbore tokens and §11.6 theme resolution, shared by CLI colors and the editor. `assets/steelbore.toml` is the canonical palette, never edited by hand. |
-| `crates/vnr-gui` | iced editor. `overlay.rs` draws the screen labels on its own thread and Wayland connection (layer-shell, `cosmic-text`, `tiny-skia`). |
+| `crates/vnr-gui` | iced editor. `overlay.rs` draws the screen labels and `preview.rs` captures screen contents (`ext-image-copy-capture-v1`, else `wlr-screencopy`), each on its own thread and Wayland connection. |
 | `crates/vnr` | The `vnr` binary: CLI Standard v1.1 grammar, output modes, errors, schema. |
 
 ## Commands
@@ -47,10 +47,11 @@ CLI tests (`crates/vnr/tests/cli.rs`) run the real binary against the fixture
 backend, so they need no display server. Each display backend also has an
 end-to-end test against a real headless server (sway, the Xorg dummy driver,
 `KWin`, Mutter), ignored by default. One script starts the server in a
-private `XDG_RUNTIME_DIR`, runs the test and stops it; CI runs all four:
+private `XDG_RUNTIME_DIR`, runs the test and stops it; CI runs all four, and
+sway once more from nixpkgs for the newer capture protocol:
 
 ```nushell
-sh scripts/test-servers.sh sway        # or kwin, mutter
+sh scripts/test-servers.sh sway        # or kwin, mutter; sway also runs the screen-contents test
 with-env { SUDO: sudo } { sh scripts/test-servers.sh xorg }   # Xorg needs root
 ```
 
@@ -134,6 +135,7 @@ Prefix every identifier with `VNR-SRS-` when citing it outside this table.
 | VNR-SRS-035 | `vnr gui --demo` shall run the editor on a sample layout without contacting any display server. | Lets anyone try the editor safely. | VNR-NEED-001 | expected | Test | verified |
 | VNR-SRS-036 | While the editor is open on a compositor with layer-shell, Vernier shall label each screen with its output name and outline the selected output's label, unless `overlays = false` is set. | Matches the screen to its rectangle, as wdisplays does. | VNR-NEED-001 | optional | Test + demonstration | verified |
 | VNR-SRS-037 | `vnr config check` shall validate `config.ncl` and report every problem it finds with the field it concerns. | A broken config must be fixable without guesswork. | Standard §10 | expected | Test | verified |
+| VNR-SRS-038 | When the user turns on screen contents (the editor switch, the `previews` key, or `previews = true`) on a compositor offering `ext-image-copy-capture-v1` or `wlr-screencopy-unstable-v1`, the editor shall draw each output's current picture, upright, inside its rectangle, refreshed at most once a second; elsewhere it shall turn the switch off and say why. | Matches the screen to its rectangle at a glance, as wdisplays' "Show Screen Contents" does. | VNR-NEED-001 | optional | Test (headless sway 1.9 and 1.12) + demonstration | verified |
 
 ### Non-functional
 

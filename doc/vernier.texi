@@ -69,7 +69,7 @@ has a graphical editor and a scriptable command line.
 * Command Line::        The @command{vnr} commands and options.
 * Profiles::            Saving and restoring layouts.
 * Making Changes Permanent::  Persisting layouts for niri and other tools.
-* Configuration File::  Key bindings and screen labels.
+* Configuration File::  Key bindings, screen labels and contents.
 * Backends::            Which display servers Vernier speaks to.
 * Environment::         Environment variables Vernier reads.
 * Exit Status::         Exit codes and error objects.
@@ -169,6 +169,7 @@ and never touches a real display, which is a safe way to try it.
 * Applying::            Apply, keep and revert.
 * Editor Keys::         Default key bindings.
 * Screen Labels::       Output names on each physical screen.
+* Screen Contents::     What each screen shows, inside its rectangle.
 @end menu
 
 @node Arranging
@@ -226,6 +227,8 @@ action names below are the names the file uses.
 @tab @code{discard} @tab @key{ESC} @tab
 @item Reload from the display server
 @tab @code{reload} @tab @key{F5}, @kbd{C-r} @tab
+@item Show or hide screen contents
+@tab @code{previews} @tab @kbd{C-p} @tab @kbd{p}
 @end multitable
 
 @key{TAB} moves keyboard focus between controls and cannot be bound.
@@ -245,6 +248,29 @@ is outlined.  Labels never take a click or a key.
 Labels need the layer-shell protocol, which niri, sway, COSMIC and KDE
 Plasma offer.  GNOME and X11 sessions get no labels.  Set
 @code{overlays = false} in the configuration file to turn them off.
+
+@node Screen Contents
+@section Screen contents
+
+@cindex screen contents
+@cindex previews
+Tick @samp{Show screen contents} in the editor's bottom bar, or press
+@kbd{C-p}, to draw what each screen shows inside its rectangle, as
+wdisplays does.  Each picture is refreshed at most once a second, and
+only when the screen has changed, so a still screen costs nothing.
+Pictures keep the screen's current shape; a rectangle edited to another
+shape shows the picture centred in it until the change is applied.
+
+Screen contents are off by default, because the pictures show whatever
+is on screen.  Set @code{previews = true} in the configuration file to
+start the editor with them on.  They are never shown in the demo
+(@samp{vnr gui --demo}).
+
+Screen contents use the @code{ext-image-copy-capture-v1} protocol where
+the compositor offers it (sway 1.11 and later, COSMIC), and
+@code{wlr-screencopy-unstable-v1} otherwise (niri, Hyprland, older
+sway).  Where neither is offered, as on GNOME, KDE Plasma and X11
+sessions, the switch turns itself off and the status line says why.
 
 @node Command Line
 @chapter Command Line
@@ -502,6 +528,7 @@ it every setting has its default.
 @example
 @{
   overlays = true,
+  previews = false,
   keys = @{
     left = ["Left", "a"],
     right = ["Right", "d"],
@@ -515,13 +542,18 @@ it every setting has its default.
 @code{true} (the default) shows screen labels while the editor is open;
 @code{false} turns them off (@pxref{Screen Labels}).
 
+@item previews
+@code{true} starts the editor with each output's screen contents shown;
+@code{false} (the default) starts it without them
+(@pxref{Screen Contents}).
+
 @item keys
 A record from action names to lists of chords.  Each action listed
 replaces its default bindings, an empty list unbinds it, and actions not
 listed keep their defaults.  The action names are @code{apply},
 @code{reload}, @code{discard}, @code{keep}, @code{revert}, @code{next},
-@code{previous}, @code{left}, @code{right}, @code{up} and @code{down}
-(@pxref{Editor Keys}).
+@code{previous}, @code{left}, @code{right}, @code{up}, @code{down} and
+@code{previews} (@pxref{Editor Keys}).
 @end table
 
 @cindex chords
