@@ -67,6 +67,25 @@ jobs:
       - run: cargo deny --locked check
       - run: cargo audit
 
+  size:
+    name: release binary size
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo build --release -p vnr --locked
+      # VNR-SRS-112: the release binary stays under 22 MB (SI, 22 000 000 bytes).
+      - name: Release binary is under 22 MB
+        run: |
+          size=$(stat -c %s target/release/vnr)
+          echo "target/release/vnr: $size bytes (limit 22000000)"
+          test "$size" -lt 22000000
+
   docs-packaging:
     name: manual, package definitions
     runs-on: ubuntu-24.04

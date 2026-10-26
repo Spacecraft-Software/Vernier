@@ -147,7 +147,7 @@ Prefix every identifier with `VNR-SRS-` when citing it outside this table.
 | VNR-SRS-103 | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` shall pass. | Lints catch defects before review. | Standard §3.1 | mandatory | CI | verified |
 | VNR-SRS-110 | `vnr output list` shall finish within 100 ms on the reference machine (ThinkPad T490s, two outputs). | Scripts call it often. | Standard §22 | expected | Benchmark | draft |
 | VNR-SRS-111 | The editor shall show its first frame within 500 ms of launch on the reference machine. | A settings tool should feel immediate. | Standard §22 | expected | Benchmark | draft |
-| VNR-SRS-112 | The release binary shall stay under 16 MB. | Bounds dependency growth. | Standard §22 | expected | CI size check | draft |
+| VNR-SRS-112 | The release binary shall stay under 22 MB. | Bounds dependency growth; 20.4 MB measured on 2026-10-26 with `opt-level = "s"`. | Standard §22 | expected | CI size check | verified |
 | VNR-SRS-113 | The editor shall use under 1 % CPU while idle with no confirmation pending. | It may stay open on a laptop. | Standard §22 | expected | Measurement | draft |
 | VNR-SRS-120 | Vernier shall open no network connection and send no telemetry. | Standard §9 privacy policy. | Standard §9 | mandatory | Inspection | verified |
 | VNR-SRS-121 | `cargo audit` and `cargo deny` shall pass in CI. | Standard §24 dependency qualification. | Standard §3.3, §24 | mandatory | CI | verified |

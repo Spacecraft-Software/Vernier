@@ -124,13 +124,29 @@ multiple_crate_versions = "allow"
 #                                (§3.2.1) does not apply.
 #   APPLIED  codegen-units = 1   enables cross-unit inlining with LTO.
 #   APPLIED  panic = "abort"     panics mean "stop" (M-PANIC-IS-STOP).
+#   APPLIED  opt-level = "s"     optimize for size (VNR-SRS-112). Vernier is
+#                                idle or waiting on the display server; the
+#                                pixel loops that matter keep level 3 below.
+#   APPLIED  strip = "symbols"   symbols are not shipped.
 #   DISABLED target-cpu=native   packages built by Nix/Guix/AUR must run on
 #                                any x86-64 machine; opt in locally with
 #                                RUSTFLAGS="-C target-cpu=native".
 #   DISABLED PGO                 no reliable profile workload yet; a GUI that
 #                                spends its time idle gains little.
 [profile.release]
+opt-level = "s"
 lto = true
 codegen-units = 1
 panic = "abort"
 strip = "symbols"
+
+# The software renderer (used when there is no GPU driver) and the
+# screen-contents thumbnailer touch every pixel; keep them fast.
+[profile.release.package.tiny-skia]
+opt-level = 3
+
+[profile.release.package.tiny-skia-path]
+opt-level = 3
+
+[profile.release.package.vnr-gui]
+opt-level = 3
