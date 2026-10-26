@@ -249,15 +249,17 @@ struct Shape {
     size: Option<(u32, u32)>,
     /// Bytes per row; `None` means four per pixel, no padding.
     stride: Option<u32>,
-    order: Option<ByteOrder>,
+    /// The format exactly as advertised: buffers must use it, not merely
+    /// one with the same byte order.
+    format: Option<wl_shm::Format>,
 }
 
 impl Shape {
-    /// Width, height, stride and byte order, once all are known.
-    fn known(self) -> Option<(u32, u32, u32, ByteOrder)> {
+    /// Width, height, stride and format, once all are known.
+    fn known(self) -> Option<(u32, u32, u32, wl_shm::Format)> {
         let (width, height) = self.size?;
         let stride = self.stride.or_else(|| width.checked_mul(4))?;
-        Some((width, height, stride, self.order?))
+        Some((width, height, stride, self.format?))
     }
 }
 
@@ -277,13 +279,6 @@ impl ByteOrder {
             wl_shm::Format::Argb8888 | wl_shm::Format::Xrgb8888 => Some(Self::Bgra),
             wl_shm::Format::Abgr8888 | wl_shm::Format::Xbgr8888 => Some(Self::Rgba),
             _ => None,
-        }
-    }
-
-    fn format(self) -> wl_shm::Format {
-        match self {
-            Self::Bgra => wl_shm::Format::Xrgb8888,
-            Self::Rgba => wl_shm::Format::Xbgr8888,
         }
     }
 }
@@ -322,6 +317,10 @@ struct Capture {
     taken: bool,
     /// A timer will start the next capture.
     waiting: bool,
+    /// Counts the ext session's constraint batches (`done` events).
+    generation: u32,
+    /// The batch the frame in flight was made for.
+    frame_generation: u32,
 }
 
 struct Capturer {
@@ -365,6 +364,8 @@ impl Capturer {
             y_invert: false,
             taken: false,
             waiting: false,
+            generation: 0,
+            frame_generation: 0,
         });
         // An ext session starts at its first `done`; screencopy now.
         if matches!(self.copier, Copier::Wlr(_)) {
@@ -395,14 +396,14 @@ impl Capturer {
     /// Makes sure output `index` has a buffer of its current shape.
     fn buffer(&mut self, index: usize) -> Option<(i32, i32)> {
         let capture = self.captures.get_mut(index)?;
-        let (width, height, stride, order) = capture.current.known()?;
+        let (width, height, stride, format) = capture.current.known()?;
         let (w, h, s) = (
             i32::try_from(width).ok()?,
             i32::try_from(height).ok()?,
             i32::try_from(stride).ok()?,
         );
         if capture.buffer.is_none() {
-            let (buffer, _) = self.pool.create_buffer(w, h, s, order.format()).ok()?;
+            let (buffer, _) = self.pool.create_buffer(w, h, s, format).ok()?;
             capture.buffer = Some(buffer);
         }
         Some((w, h))
@@ -432,6 +433,7 @@ impl Capturer {
                 let (Some(session), Some(buffer)) = (&capture.session, &capture.buffer) else {
                     return;
                 };
+                capture.frame_generation = capture.generation;
                 let frame = session.create_frame(&self.qh, capture.output.clone());
                 frame.attach_buffer(buffer.wl_buffer());
                 frame.damage_buffer(0, 0, w, h);
@@ -507,9 +509,12 @@ impl Capturer {
         if capture.session.is_none() {
             capture.transform = output_transform.unwrap_or(wl_output::Transform::Normal);
         }
-        let (Some((width, height, stride, order)), Some(buffer)) =
+        let (Some((width, height, stride, format)), Some(buffer)) =
             (capture.current.known(), capture.buffer.as_ref())
         else {
+            return;
+        };
+        let Some(order) = ByteOrder::of(format) else {
             return;
         };
         let (transform, y_invert, name) =
@@ -711,8 +716,8 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, wl_output::WlOutput> for Capturer {
                 format: WEnum::Value(format),
             } => {
                 // Keep the first readable format the compositor lists.
-                if capture.incoming.order.is_none() {
-                    capture.incoming.order = ByteOrder::of(format);
+                if capture.incoming.format.is_none() && ByteOrder::of(format).is_some() {
+                    capture.incoming.format = Some(format);
                 }
             }
             E::Done => {
@@ -721,6 +726,7 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, wl_output::WlOutput> for Capturer {
                     capture.buffer = None;
                 }
                 capture.current = next;
+                capture.generation = capture.generation.wrapping_add(1);
                 state.capture(index);
             }
             E::Stopped => state.remove(data),
@@ -748,9 +754,16 @@ impl Dispatch<ExtImageCopyCaptureFrameV1, wl_output::WlOutput> for Capturer {
             } => state.captures[index].transform = transform,
             E::Ready => state.ready(index),
             E::Failed { reason } => {
+                let capture = &state.captures[index];
+                let refreshed = capture.generation != capture.frame_generation;
                 state.drop_frame(index);
                 match reason {
-                    // New constraints follow; their `done` starts the next capture.
+                    // Constraints that arrived while the frame was in flight
+                    // are already in effect: retry with them now. Otherwise
+                    // their `done` is still coming and starts the capture.
+                    WEnum::Value(FailureReason::BufferConstraints) if refreshed => {
+                        state.capture(index);
+                    }
                     WEnum::Value(FailureReason::BufferConstraints) => {}
                     WEnum::Value(FailureReason::Stopped) => state.remove(data),
                     _ => state.later(index),
@@ -783,13 +796,11 @@ impl Dispatch<ZwlrScreencopyFrameV1, wl_output::WlOutput> for Capturer {
                 stride,
             } => {
                 // Keep the first readable shared-memory buffer offered.
-                if capture.incoming.order.is_none()
-                    && let Some(order) = ByteOrder::of(format)
-                {
+                if capture.incoming.format.is_none() && ByteOrder::of(format).is_some() {
                     capture.incoming = Shape {
                         size: Some((width, height)),
                         stride: Some(stride),
-                        order: Some(order),
+                        format: Some(format),
                     };
                 }
                 // Before version 3 there is no `buffer_done`, and this is
