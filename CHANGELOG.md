@@ -7,9 +7,10 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 ### Changed
 
 - Release builds optimize for size (`opt-level = "s"`), keeping level 3 for
-  the software renderer and the editor: 26.4 MB down to 20.4 MB, with no
-  measurable change to `output list` or `layout export` (3 ms). CI now fails
-  a release binary of 22 MB or more (VNR-SRS-112).
+  the software renderer and the editor: 26.4 MB down to 20.4 MB. Measured
+  before and after: `output list` 3.2 ms both, `layout export` 3.0 and
+  2.8 ms, `config check` 14.2 and 16.0 ms. CI now fails a release binary of
+  22 MB or more (VNR-SRS-112).
 
 ### Fixed
 
