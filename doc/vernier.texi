@@ -153,7 +153,7 @@ cargo build --release --locked
 @cindex run-time libraries
 The binary links only the C runtime.  At run time the editor needs
 @file{libxkbcommon} and, on Wayland, @file{libwayland-client} or, on X11,
-@file{libX11}; it uses a Vulkan or OpenGL driver when one is present and
+@file{libX11}, @file{libX11-xcb}, @file{libXcursor} and @file{libXi}; it uses a Vulkan or OpenGL driver when one is present and
 falls back to a software renderer otherwise.  The command line needs none
 of them.  If a required library cannot be loaded, @command{vnr gui} names
 it and exits with status 17 (@code{LIBRARY_MISSING}).

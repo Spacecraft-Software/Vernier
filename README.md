@@ -151,7 +151,7 @@ make info html pdf        # the manual, into doc/build/
 Requires Rust 1.90 or later; the manual needs Texinfo, and the PDF also TeX.
 The binary links only the C runtime; the Wayland protocol code is pure Rust.
 At run time the editor needs `libxkbcommon` and `libwayland-client` (Wayland)
-or `libX11` (X11), and uses a Vulkan or OpenGL driver if present, falling back
+or `libX11`, `libX11-xcb`, `libXcursor` and `libXi` (X11), and uses a Vulkan or OpenGL driver if present, falling back
 to a software renderer otherwise. On NixOS, run the editor from the Nix package
 below, which sets the library path; a plain `cargo build` exits with
 `LIBRARY_MISSING` and names the libraries it cannot load.
