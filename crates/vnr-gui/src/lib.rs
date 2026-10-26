@@ -21,11 +21,13 @@
 
 mod app;
 mod arrangement;
+mod libs;
 mod overlay;
 pub mod preview;
 pub mod theme;
 
 use iced::{Font, Size};
+pub use libs::missing_libraries;
 use vnr_core::BackendKind;
 
 /// Default body font (Steelbore Standard §12). Resolved through the system

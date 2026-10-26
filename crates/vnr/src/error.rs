@@ -14,7 +14,7 @@ use vnr_core::{BackendError, ProfileError};
 use crate::time;
 
 /// Stable error codes. The canonical ones come first; `vnr`-specific codes
-/// use the 10–16 exit-code band and are listed in `vnr schema`.
+/// use the 10–17 exit-code band and are listed in `vnr schema`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ErrorCode {
@@ -44,11 +44,13 @@ pub enum ErrorCode {
     InvalidLayout,
     /// Restoring the previous configuration failed.
     RevertFailed,
+    /// A shared library the editor loads at run time cannot be found.
+    LibraryMissing,
 }
 
 impl ErrorCode {
     /// Every code, in exit-code order, for `vnr schema`.
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::InternalError,
         Self::InvalidArgument,
         Self::MissingArgument,
@@ -62,6 +64,7 @@ impl ErrorCode {
         Self::Reverted,
         Self::InvalidLayout,
         Self::RevertFailed,
+        Self::LibraryMissing,
     ];
 
     /// The process exit code for this error.
@@ -80,6 +83,7 @@ impl ErrorCode {
             Self::Reverted => 14,
             Self::InvalidLayout => 15,
             Self::RevertFailed => 16,
+            Self::LibraryMissing => 17,
         }
     }
 
@@ -100,6 +104,7 @@ impl ErrorCode {
             Self::Reverted => "REVERTED",
             Self::InvalidLayout => "INVALID_LAYOUT",
             Self::RevertFailed => "REVERT_FAILED",
+            Self::LibraryMissing => "LIBRARY_MISSING",
         }
     }
 
@@ -120,6 +125,7 @@ impl ErrorCode {
             Self::Reverted => "the change was not confirmed and the previous one was restored",
             Self::InvalidLayout => "the resulting layout has errors and was not sent",
             Self::RevertFailed => "restoring the previous configuration failed",
+            Self::LibraryMissing => "a library the editor loads at run time cannot be found",
         }
     }
 }
@@ -193,6 +199,32 @@ impl AppError {
         }
     }
 
+    /// The editor cannot open its window because `missing` libraries cannot
+    /// be loaded. On NixOS a plain `cargo build` finds none of them; the Nix
+    /// package wraps the binary with the right library path, so the hint
+    /// builds it from the checkout. Elsewhere the hint asks the loader
+    /// where the libraries are.
+    #[must_use]
+    pub fn missing_libraries(missing: &[&str], nixos: bool) -> Self {
+        let hint = if nixos {
+            "nix-build -E 'with import <nixpkgs> {}; callPackage ./packaging/default.nix {}' ; ./result/bin/vnr gui".to_owned()
+        } else {
+            let patterns: Vec<String> = missing.iter().map(|lib| format!("-e {lib}")).collect();
+            format!("ldconfig -p | grep {}", patterns.join(" "))
+        };
+        let advice = match (nixos, missing.len()) {
+            (true, _) => "this build is not wrapped with the Nix library path",
+            (false, 1) => "install the distribution package that provides it",
+            (false, _) => "install the distribution packages that provide them",
+        };
+        Self::new(
+            ErrorCode::LibraryMissing,
+            format!("the editor cannot load {}; {advice}", missing.join(", ")),
+            hint,
+        )
+        .with("missing_libraries", missing)
+    }
+
     /// Converts a profile failure.
     #[must_use]
     pub fn profile(error: &ProfileError, path: &str) -> Self {
@@ -239,6 +271,26 @@ pub fn lower_first(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn missing_libraries_are_named_with_a_runnable_hint() {
+        let libs = ["libwayland-client.so.0", "libxkbcommon.so.0"];
+        let e = AppError::missing_libraries(&libs, false);
+        assert_eq!(e.code, ErrorCode::LibraryMissing);
+        assert_eq!(e.exit_code, 17);
+        assert!(
+            e.message
+                .contains("libwayland-client.so.0, libxkbcommon.so.0")
+        );
+        assert_eq!(
+            e.hint,
+            "ldconfig -p | grep -e libwayland-client.so.0 -e libxkbcommon.so.0"
+        );
+        assert_eq!(e.extensions["missing_libraries"], serde_json::json!(libs));
+        let nix = AppError::missing_libraries(&libs, true);
+        assert!(nix.hint.contains("packaging/default.nix"), "{}", nix.hint);
+        assert!(nix.message.contains("Nix library path"), "{}", nix.message);
+    }
 
     #[test]
     fn exit_codes_are_unique_and_outside_reserved_ranges() {

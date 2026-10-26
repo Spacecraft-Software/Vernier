@@ -92,7 +92,7 @@ change or overwrites a file without asking.
 calling) and `vnr describe` the capability manifest. Exit codes: 0 success,
 2 usage, 3 not found, 4 path not allowed, 5 conflict, 10 backend unavailable,
 11 unsupported, 12 rejected by the compositor, 13 protocol error, 14 reverted,
-15 invalid layout, 16 revert failed.
+15 invalid layout, 16 revert failed, 17 library missing.
 
 `--backend` (or `VNR_BACKEND`) forces `wlr`, `cosmic`, `kde`, `mutter` or
 `x11`. File arguments must lie in the working directory or Vernier's XDG
@@ -150,8 +150,11 @@ make info html pdf        # the manual, into doc/build/
 
 Requires Rust 1.90 or later; the manual needs Texinfo, and the PDF also TeX.
 The binary links only the C runtime; the Wayland protocol code is pure Rust.
-At run time the editor loads `libwayland-client`, `libxkbcommon` and a Vulkan
-or OpenGL driver if present, and falls back to a software renderer otherwise.
+At run time the editor needs `libxkbcommon` and `libwayland-client` (Wayland)
+or `libX11` (X11), and uses a Vulkan or OpenGL driver if present, falling back
+to a software renderer otherwise. On NixOS, run the editor from the Nix package
+below, which sets the library path; a plain `cargo build` exits with
+`LIBRARY_MISSING` and names the libraries it cannot load.
 
 The full reference is the Texinfo manual,
 [`doc/vernier.texi`](doc/vernier.texi): `info vernier` once installed.

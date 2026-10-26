@@ -4609,6 +4609,9 @@ dependencies = [
  "wayland-client",
  "wayland-protocols",
  "wayland-protocols-wlr",
+ "wayland-sys",
+ "x11-dl",
+ "xkbcommon-dl",
 ]
 
 [[package]]

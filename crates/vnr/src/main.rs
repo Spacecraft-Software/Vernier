@@ -201,6 +201,23 @@ fn clap_error(e: &clap::Error, args: &[String], env: &Env) -> u8 {
     }
 }
 
+/// The toolkit panics, rather than returning an error, when it cannot
+/// create its event loop: no compositor or X server is listening where the
+/// environment points. That is an unavailable display, not a bug in `vnr`.
+fn window_failure(payload: &str) -> Option<AppError> {
+    let cause = payload.strip_prefix("Create event loop: ")?;
+    // winit wraps the cause in its own source location; keep only the cause.
+    let cause = cause
+        .rfind("error: ")
+        .and_then(|i| cause[i + "error: ".len()..].strip_suffix(" })"))
+        .unwrap_or(cause);
+    Some(AppError::new(
+        ErrorCode::BackendUnavailable,
+        format!("the editor cannot reach a display server to open its window: {cause}"),
+        "vnr --verbose backend get",
+    ))
+}
+
 /// Release builds abort on panic, so the hook is the last chance to tell
 /// the caller what happened in the agreed shape (exit 1, `INTERNAL_ERROR`).
 fn install_panic_hook() {
@@ -217,12 +234,43 @@ fn install_panic_hook() {
             .map(|s| (*s).to_owned())
             .or_else(|| info.payload().downcast_ref::<String>().cloned())
             .unwrap_or_default();
-        let error = AppError::new(
-            ErrorCode::InternalError,
-            format!("internal error{location}: {payload}"),
-            "vnr --verbose backend get",
-        );
+        let error = window_failure(&payload).unwrap_or_else(|| {
+            AppError::new(
+                ErrorCode::InternalError,
+                format!("internal error{location}: {payload}"),
+                "vnr --verbose backend get",
+            )
+        });
+        let exit = error.exit_code;
         let _ = early_report(error, &args, &env);
-        std::process::exit(1);
+        std::process::exit(i32::from(exit));
     }));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_unreachable_display_is_not_an_internal_error() {
+        let e = window_failure(
+            "Create event loop: Os(OsError { line: 89, file: \"x.rs\", \
+             error: WaylandError(Connection(NoCompositor)) })",
+        )
+        .expect("recognized");
+        assert_eq!(e.code, ErrorCode::BackendUnavailable);
+        assert!(
+            e.message
+                .ends_with("window: WaylandError(Connection(NoCompositor))"),
+            "{}",
+            e.message
+        );
+        let bare = window_failure("Create event loop: NotSupported").expect("recognized");
+        assert!(
+            bare.message.ends_with("window: NotSupported"),
+            "{}",
+            bare.message
+        );
+        assert!(window_failure("index out of bounds").is_none());
+    }
 }
