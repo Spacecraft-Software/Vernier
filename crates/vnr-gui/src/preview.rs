@@ -174,13 +174,17 @@ fn connect(display: Option<&str>) -> Result<Connection, String> {
     Connection::from_socket(stream).map_err(|e| e.to_string())
 }
 
-/// The bound capture protocol.
-enum Copier {
-    Ext {
-        sources: ExtOutputImageCaptureSourceManagerV1,
-        copier: ExtImageCopyCaptureManagerV1,
-    },
-    Wlr(ZwlrScreencopyManagerV1),
+/// The two managers of `ext-image-copy-capture-v1`.
+struct ExtManagers {
+    sources: ExtOutputImageCaptureSourceManagerV1,
+    copier: ExtImageCopyCaptureManagerV1,
+}
+
+/// The bound capture protocols. Each output uses ext when bound and
+/// screencopy otherwise, or when ext offers it no readable buffer format.
+struct Copier {
+    ext: Option<ExtManagers>,
+    wlr: Option<ZwlrScreencopyManagerV1>,
 }
 
 impl Copier {
@@ -189,18 +193,22 @@ impl Copier {
         qh: &QueueHandle<Capturer>,
         method: Method,
     ) -> Result<Self, String> {
-        if method == Method::Best {
-            let sources = globals.bind(qh, 1..=1, ());
-            let copier = globals.bind(qh, 1..=1, ());
-            if let (Ok(sources), Ok(copier)) = (sources, copier) {
-                return Ok(Self::Ext { sources, copier });
-            }
+        let ext = (method == Method::Best)
+            .then(|| {
+                let sources = globals.bind(qh, 1..=1, ()).ok()?;
+                let copier = globals.bind(qh, 1..=1, ()).ok()?;
+                Some(ExtManagers { sources, copier })
+            })
+            .flatten();
+        let wlr = globals.bind(qh, 1..=3, ()).ok();
+        if ext.is_none() && wlr.is_none() {
+            return Err(
+                "the compositor offers neither ext-image-copy-capture-v1 nor \
+                        wlr-screencopy-unstable-v1"
+                    .to_owned(),
+            );
         }
-        globals.bind(qh, 1..=3, ()).map(Self::Wlr).map_err(|_e| {
-            "the compositor offers neither ext-image-copy-capture-v1 nor \
-             wlr-screencopy-unstable-v1"
-                .to_owned()
-        })
+        Ok(Self { ext, wlr })
     }
 }
 
@@ -337,17 +345,16 @@ impl Capturer {
         let Some(name) = self.outputs.info(&output).and_then(|info| info.name) else {
             return;
         };
-        let session = match &self.copier {
-            Copier::Ext { sources, copier } => {
-                let source = sources.create_source(&output, &self.qh, ());
-                let session =
-                    copier.create_session(&source, Options::empty(), &self.qh, output.clone());
-                // The session keeps what it needs; the source can go.
-                source.destroy();
-                Some(session)
-            }
-            Copier::Wlr(_) => None,
-        };
+        let session = self.copier.ext.as_ref().map(|ext| {
+            let source = ext.sources.create_source(&output, &self.qh, ());
+            let session =
+                ext.copier
+                    .create_session(&source, Options::empty(), &self.qh, output.clone());
+            // The session keeps what it needs; the source can go.
+            source.destroy();
+            session
+        });
+        let starts_now = session.is_none();
         self.captures.push(Capture {
             output,
             name,
@@ -362,7 +369,7 @@ impl Capturer {
             waiting: false,
         });
         // An ext session starts at its first `done`; screencopy now.
-        if matches!(self.copier, Copier::Wlr(_)) {
+        if starts_now {
             self.capture(self.captures.len() - 1);
         }
     }
@@ -412,28 +419,48 @@ impl Capturer {
             return;
         }
         capture.y_invert = false;
-        match &self.copier {
-            Copier::Wlr(manager) => {
+        if capture.session.is_none() {
+            if let Some(manager) = &self.copier.wlr {
                 // The frame announces the buffer it needs; see `copy`.
                 let frame =
                     manager.capture_output(0, &capture.output, &self.qh, capture.output.clone());
                 capture.frame = Some(Frame::Wlr(frame));
             }
-            Copier::Ext { .. } => {
-                let Some((w, h)) = self.buffer(index) else {
-                    return;
-                };
-                let capture = &mut self.captures[index];
-                let (Some(session), Some(buffer)) = (&capture.session, &capture.buffer) else {
-                    return;
-                };
-                let frame = session.create_frame(&self.qh, capture.output.clone());
-                frame.attach_buffer(buffer.wl_buffer());
-                frame.damage_buffer(0, 0, w, h);
-                frame.capture();
-                capture.frame = Some(Frame::Ext(frame));
-            }
+            return;
         }
+        let Some((w, h)) = self.buffer(index) else {
+            return;
+        };
+        let capture = &mut self.captures[index];
+        let (Some(session), Some(buffer)) = (&capture.session, &capture.buffer) else {
+            return;
+        };
+        let frame = session.create_frame(&self.qh, capture.output.clone());
+        frame.attach_buffer(buffer.wl_buffer());
+        frame.damage_buffer(0, 0, w, h);
+        frame.capture();
+        capture.frame = Some(Frame::Ext(frame));
+    }
+
+    /// Moves output `index` from its ext session to screencopy, when the
+    /// session offers no buffer format this module reads. Without
+    /// screencopy the output simply shows no picture.
+    fn fall_back(&mut self, index: usize) {
+        if self.copier.wlr.is_none() {
+            return;
+        }
+        let Some(capture) = self.captures.get_mut(index) else {
+            return;
+        };
+        if let Some(frame) = capture.frame.take() {
+            frame.destroy();
+        }
+        if let Some(session) = capture.session.take() {
+            session.destroy();
+        }
+        capture.current = Shape::default();
+        capture.buffer = None;
+        self.capture(index);
     }
 
     /// Copies a screencopy frame once its buffer shape is announced.
@@ -717,13 +744,18 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, wl_output::WlOutput> for Capturer {
                 let next = std::mem::take(&mut capture.incoming);
                 let changed = next != capture.current;
                 capture.current = next;
+                let readable = next.format.is_some();
                 if changed {
                     // A frame in flight was made for the old buffer: drop it
                     // before the buffer, then capture with the new shape.
                     state.drop_frame(index);
                     state.captures[index].buffer = None;
                 }
-                state.capture(index);
+                if readable {
+                    state.capture(index);
+                } else {
+                    state.fall_back(index);
+                }
             }
             E::Stopped => state.remove(data),
             _ => {}
