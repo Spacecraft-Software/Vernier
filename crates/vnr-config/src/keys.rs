@@ -35,11 +35,13 @@ pub enum Action {
     Up,
     /// Move the selected output down (Shift: by 10).
     Down,
+    /// Show or hide the screen contents inside each output.
+    Previews,
 }
 
 impl Action {
     /// Every action, in the order the documentation lists them.
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Apply,
         Self::Reload,
         Self::Discard,
@@ -51,6 +53,7 @@ impl Action {
         Self::Right,
         Self::Up,
         Self::Down,
+        Self::Previews,
     ];
 
     /// The action's name in the configuration file.
@@ -68,6 +71,7 @@ impl Action {
             Self::Right => "right",
             Self::Up => "up",
             Self::Down => "down",
+            Self::Previews => "previews",
         }
     }
 
@@ -87,6 +91,7 @@ impl Action {
             Self::Right => &["Right", "l"],
             Self::Up => &["Up", "k"],
             Self::Down => &["Down", "j"],
+            Self::Previews => &["Ctrl+p", "p"],
         }
     }
 }

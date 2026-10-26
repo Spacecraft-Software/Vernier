@@ -3,14 +3,77 @@
 
 //! The canvas that shows outputs as rectangles and lets the user drag them.
 
+use std::collections::BTreeMap;
+
 use iced::mouse;
-use iced::widget::canvas::{self, Event, Frame, Geometry, Path, Program, Stroke, Text};
+use iced::widget::canvas::{self, Event, Frame, Geometry, Image, Path, Program, Stroke, Text};
+use iced::widget::image;
 use iced::widget::text::Alignment;
 use iced::{Point, Rectangle, Renderer, Size, Theme, alignment, keyboard};
 use vnr_core::geometry::snap;
 use vnr_core::{Layout, Position, Rect};
 
+use crate::preview::Thumbnail;
 use crate::theme::Steelbore;
+
+/// Gap between an output's outline and its screen contents, at least the
+/// widest outline. The renderer draws pictures above lines, so the picture
+/// must leave the outline (selection, overlap) uncovered.
+const PICTURE_INSET: f32 = 3.0;
+
+/// Offsets of the halo drawn behind text over screen contents, which keeps
+/// it readable over any picture (text is drawn above pictures).
+const HALO: [(f32, f32); 8] = [
+    (-1.0, -1.0),
+    (0.0, -1.0),
+    (1.0, -1.0),
+    (-1.0, 0.0),
+    (1.0, 0.0),
+    (-1.0, 1.0),
+    (0.0, 1.0),
+    (1.0, 1.0),
+];
+
+/// A picture of an output's screen, ready to draw.
+#[derive(Debug, Clone)]
+pub struct Shot {
+    handle: image::Handle,
+    width: u32,
+    height: u32,
+}
+
+impl Shot {
+    /// Uploads `thumbnail` as an image the renderer can draw.
+    pub fn new(thumbnail: Thumbnail) -> Self {
+        Self {
+            width: thumbnail.width,
+            height: thumbnail.height,
+            handle: image::Handle::from_rgba(thumbnail.width, thumbnail.height, thumbnail.rgba),
+        }
+    }
+}
+
+/// The largest rectangle with the proportions `width` x `height` centred in
+/// `area`. Pictures keep their shape when the edited layout gives an
+/// output a different one than the screen has now.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "thumbnail sizes are far below 2^23"
+)]
+fn fit(area: Rectangle, width: u32, height: u32) -> Rectangle {
+    if width == 0 || height == 0 || area.width <= 0.0 || area.height <= 0.0 {
+        return area;
+    }
+    let zoom = (area.width / width as f32).min(area.height / height as f32);
+    let size = Size::new(width as f32 * zoom, height as f32 * zoom);
+    Rectangle::new(
+        Point::new(
+            area.x + (area.width - size.width) / 2.0,
+            area.y + (area.height - size.height) / 2.0,
+        ),
+        size,
+    )
+}
 
 /// Distance in screen pixels within which a dragged edge snaps.
 ///
@@ -132,6 +195,8 @@ pub struct Arrangement<'a> {
     pub selected: Option<usize>,
     /// Names of outputs involved in an overlap.
     pub overlapping: &'a [String],
+    /// Screen contents by output name, when shown.
+    pub shots: &'a BTreeMap<String, Shot>,
     /// Theme tokens.
     pub tokens: &'a Steelbore,
 }
@@ -241,6 +306,20 @@ impl Program<CanvasEvent> for Arrangement<'_> {
             let overlapping = self.overlapping.contains(&output.name);
 
             frame.fill_rectangle(area.position(), area.size(), tokens.surface);
+            let shot = self.shots.get(&output.name);
+            if let Some(shot) = shot {
+                let inner = Rectangle::new(
+                    Point::new(area.x + PICTURE_INSET, area.y + PICTURE_INSET),
+                    Size::new(
+                        (area.width - 2.0 * PICTURE_INSET).max(0.0),
+                        (area.height - 2.0 * PICTURE_INSET).max(0.0),
+                    ),
+                );
+                frame.draw_image(
+                    fit(inner, shot.width, shot.height),
+                    Image::new(shot.handle.clone()),
+                );
+            }
             let (color, width) = match (selected, overlapping) {
                 (true, _) => (tokens.focus, 3.0),
                 (false, true) => (tokens.warning, 2.0),
@@ -273,7 +352,7 @@ impl Program<CanvasEvent> for Arrangement<'_> {
                 lines.push("overlaps".to_owned());
             }
             let size = (area.height / 7.0).clamp(10.0, 18.0);
-            frame.fill_text(Text {
+            let text = Text {
                 content: lines.join("\n"),
                 position: area.center(),
                 max_width: area.width - 8.0,
@@ -282,7 +361,17 @@ impl Program<CanvasEvent> for Arrangement<'_> {
                 align_x: Alignment::Center,
                 align_y: alignment::Vertical::Center,
                 ..Text::default()
-            });
+            };
+            if shot.is_some() {
+                for (dx, dy) in HALO {
+                    frame.fill_text(Text {
+                        position: Point::new(text.position.x + dx, text.position.y + dy),
+                        color: tokens.surface,
+                        ..text.clone()
+                    });
+                }
+            }
+            frame.fill_text(text);
         }
         vec![frame.into_geometry()]
     }
@@ -325,6 +414,15 @@ mod tests {
         let screen = view.to_screen(Rect::new(1920, 0, 1920, 1080));
         let (x, y) = view.to_logical(Point::new(screen.x, screen.y));
         assert!((x - 1920).abs() <= 2 && y.abs() <= 2, "got {x},{y}");
+    }
+
+    #[test]
+    fn pictures_keep_their_shape() {
+        let area = Rectangle::new(Point::new(10.0, 20.0), Size::new(200.0, 100.0));
+        let tall = fit(area, 90, 160);
+        assert!((tall.height - 100.0).abs() < 0.01 && (tall.width - 56.25).abs() < 0.01);
+        assert!((tall.center_x() - area.center_x()).abs() < 0.01);
+        assert_eq!(fit(area, 0, 5), area);
     }
 
     #[test]

@@ -108,9 +108,16 @@ directories; `VNR_ALLOWED_PATHS` adds more.
 | Keep / revert a pending change | `keep` / `revert` | Keep / Revert buttons | `y` / `n` |
 | Discard edits (or revert a pending change) | `discard` | Escape | |
 | Reload from the display server | `reload` | F5, Ctrl+R | |
+| Show / hide screen contents | `previews` | Ctrl+P | `p` |
 
 Drag an output to move it; edges snap to neighbors, hold Shift to place it
 freely. Tab moves keyboard focus between controls.
+
+**Show screen contents** draws what each screen shows inside its rectangle,
+refreshed at most once a second and only when the screen changed. It uses
+`ext-image-copy-capture-v1` (sway 1.11+, COSMIC) or `wlr-screencopy` (niri,
+Hyprland); GNOME, KDE Plasma and X11 have neither. Off by default, since the
+pictures show whatever is on screen.
 
 Rebind keys in `~/.config/vernier/config.ncl`, a [Nickel](https://nickel-lang.org/)
 file. Each action you list replaces its defaults, an empty list unbinds it,
@@ -121,6 +128,7 @@ times larger.
 ```nickel
 {
   overlays = true,   # label each screen with its output name
+  previews = false,  # start with screen contents shown
   keys = {
     left = ["Left", "a"],
     right = ["Right", "d"],

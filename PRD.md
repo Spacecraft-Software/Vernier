@@ -66,7 +66,6 @@ KDE and GNOME capabilities are planned from their protocol definitions and will 
 
 **Out of scope for 1.0**
 
-- Live screen previews inside the canvas (wdisplays' "Show Screen Contents"). Planned as optional work after 1.0.
 - A hotplug daemon, Weston, Mir, and Wayland compositors with no output-management protocol.
 - Custom modelines and EDID overrides.
 

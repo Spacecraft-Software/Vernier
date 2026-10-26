@@ -290,6 +290,8 @@ pub struct ConfigReport {
     pub source: String,
     /// Whether the editor labels each screen with its output name.
     pub overlays: bool,
+    /// Whether the editor starts with each output's screen contents shown.
+    pub previews: bool,
     /// Every editor action and the keys bound to it.
     pub keys: Vec<BindingRecord>,
 }

@@ -57,7 +57,7 @@ MVP: M0–M7 — Vernier v1.0
 - [x] P-025 CI: fmt, clippy `-D warnings`, tests, `cargo audit`, `cargo deny` (`deny.toml`)
 - [x] P-026 Persist through the compositor: write niri `output` blocks to an included file on request (`--persist`, editor "Save for niri"; checked with niri 26.04 `validate`)
 - [x] P-027 Export to shikane, kanshi and a home-manager snippet (optional)
-- [ ] P-028 Live screen previews via `ext-image-copy-capture-v1` (optional)
+- [x] P-028 Live screen previews via `ext-image-copy-capture-v1`, falling back to `wlr-screencopy` (optional; all eight transforms checked upright through both protocols on headless sway 1.12, rotations through screencopy on sway 1.9)
 
 ## M6 — Accessibility and input
 

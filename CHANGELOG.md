@@ -22,6 +22,11 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 - Screen labels: while the editor is open, each screen shows its output
   name through layer-shell, the selected one outlined; clicks pass through.
   `overlays = false` in `config.ncl` turns them off.
+- Screen contents: Show screen contents (Ctrl+P, `p`) draws each output's
+  picture inside its rectangle, captured through `ext-image-copy-capture-v1`
+  or, on niri and Hyprland, `wlr-screencopy`; at most once a second, upright
+  for any transform. Off by default; `previews = true` in `config.ncl` starts
+  with it on. CI also runs the sway tests on sway from nixpkgs.
 - Texinfo manual `doc/vernier.texi` (CC-BY-SA-4.0), built by
   `make info html pdf`; every package installs it as an Info file.
 - Guix (`packaging/guix.scm`, crate list generated from `Cargo.lock` by

@@ -3,6 +3,7 @@
 
 //! Application state, update logic and view.
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -24,8 +25,9 @@ use vnr_core::{
 use vnr_config::{Action, Chord, KeyMap};
 
 use crate::Options;
-use crate::arrangement::{Arrangement, CanvasEvent};
+use crate::arrangement::{Arrangement, CanvasEvent, Shot};
 use crate::overlay::Overlays;
+use crate::preview;
 use crate::theme::{self, Resolution, Steelbore};
 
 /// Seconds the user has to confirm a new configuration before it is
@@ -93,6 +95,8 @@ pub enum KeyCommand {
     Yes,
     /// Revert a pending change.
     No,
+    /// Show or hide the screen contents.
+    Previews,
 }
 
 impl KeyCommand {
@@ -111,6 +115,7 @@ impl KeyCommand {
             Action::Right => Self::Nudge(step, 0),
             Action::Up => Self::Nudge(0, -step),
             Action::Down => Self::Nudge(0, step),
+            Action::Previews => Self::Previews,
         }
     }
 }
@@ -173,6 +178,10 @@ pub enum Message {
     Reset,
     /// A key was pressed; the key map decides what it does.
     KeyPress(KeyPress),
+    /// The screen-contents switch changed.
+    SetPreviews(bool),
+    /// The capture thread sent a picture, or gave up.
+    Preview(preview::Event),
 }
 
 /// The editor.
@@ -182,6 +191,10 @@ pub struct App {
     keys: KeyMap,
     /// Screen labels; `None` in demo mode, when turned off, or without layer-shell.
     overlays: Option<Overlays>,
+    /// Screen contents are shown; never in demo mode.
+    previews: bool,
+    /// The latest picture of each output, by name.
+    shots: BTreeMap<String, Shot>,
     resolution: Resolution,
     theme: Theme,
     kind: Option<BackendKind>,
@@ -291,6 +304,8 @@ impl App {
         let app = Self {
             keys: options.config.keys.clone(),
             overlays,
+            previews: options.config.previews && !options.demo,
+            shots: BTreeMap::new(),
             theme: theme::iced_theme(&resolution.tokens),
             resolution,
             kind: None,
@@ -345,17 +360,29 @@ impl App {
         self.theme.clone()
     }
 
-    /// Ticks once a second while a confirmation is pending; listens to the
-    /// keyboard always.
+    /// Listens to the keyboard always, ticks once a second while a
+    /// confirmation is pending, and receives screen contents while they
+    /// are shown. Turning previews off drops the capture subscription,
+    /// which stops its thread.
     pub fn subscription(&self) -> Subscription<Message> {
-        let keys = iced::event::listen_with(key_command);
+        let mut subscriptions = vec![iced::event::listen_with(key_command)];
         if self.pending.is_some() {
-            Subscription::batch([
-                keys,
-                time::every(Duration::from_secs(1)).map(|_| Message::Tick),
-            ])
-        } else {
-            keys
+            subscriptions.push(time::every(Duration::from_secs(1)).map(|_| Message::Tick));
+        }
+        if self.previews {
+            subscriptions.push(Subscription::run(preview::start).map(Message::Preview));
+        }
+        Subscription::batch(subscriptions)
+    }
+
+    fn set_previews(&mut self, on: bool) {
+        if on && self.options.demo {
+            "The demo layout has no screens to show.".clone_into(&mut self.status);
+            return;
+        }
+        self.previews = on;
+        if !on {
+            self.shots.clear();
         }
     }
 
@@ -514,6 +541,17 @@ impl App {
                 self.draft = self.applied.clone();
                 self.edited();
             }
+            Message::SetPreviews(on) => self.set_previews(on),
+            Message::Preview(preview::Event::Frame { output, thumbnail }) => {
+                // A picture may still arrive just after previews went off.
+                if self.previews {
+                    self.shots.insert(output, Shot::new(thumbnail));
+                }
+            }
+            Message::Preview(preview::Event::Unavailable(why)) => {
+                self.set_previews(false);
+                self.status = format!("Screen contents unavailable: {why}");
+            }
             Message::KeyPress(press) => {
                 return match self.keys.action(&press.chord) {
                     Some(action) if press.free || press.chord.always_applies() => {
@@ -627,6 +665,7 @@ impl App {
             KeyCommand::Yes if self.pending.is_some() => self.update(Message::Keep),
             KeyCommand::Escape => self.update(Message::Reset),
             KeyCommand::Reload => self.update(Message::Reload),
+            KeyCommand::Previews => self.update(Message::SetPreviews(!self.previews)),
             KeyCommand::Yes | KeyCommand::No => Task::none(),
         }
     }
@@ -723,6 +762,7 @@ impl App {
             layout: &self.draft,
             selected: self.selected,
             overlapping: &self.overlapping,
+            shots: &self.shots,
             tokens: self.tokens(),
         })
         .width(Length::Fill)
@@ -943,24 +983,31 @@ impl App {
         let idle = self.busy.is_none() && self.pending.is_none();
         let edited = self.draft != self.applied;
         container(
-            row![
-                text(source),
-                text(status).width(Length::Fill),
-                button("Reload")
-                    .style(button::secondary)
-                    .on_press_maybe(idle.then_some(Message::Reload)),
-                button("Reset")
-                    .style(button::secondary)
-                    .on_press_maybe((idle && edited).then_some(Message::Reset)),
-                button("Apply").on_press_maybe(self.can_apply().then_some(Message::Apply)),
-            ]
-            .push(self.offers_niri_save().then(|| {
-                button("Save for niri")
-                    .style(button::secondary)
-                    .on_press_maybe(self.can_save_niri().then_some(Message::SaveNiri))
-            }))
-            .spacing(12)
-            .align_y(iced::Alignment::Center),
+            row![text(source), text(status).width(Length::Fill)]
+                .push((!self.options.demo).then(|| {
+                    checkbox(self.previews)
+                        .label("Show screen contents")
+                        .on_toggle(Message::SetPreviews)
+                }))
+                .push(
+                    row![
+                        button("Reload")
+                            .style(button::secondary)
+                            .on_press_maybe(idle.then_some(Message::Reload)),
+                        button("Reset")
+                            .style(button::secondary)
+                            .on_press_maybe((idle && edited).then_some(Message::Reset)),
+                        button("Apply").on_press_maybe(self.can_apply().then_some(Message::Apply)),
+                    ]
+                    .spacing(12),
+                )
+                .push(self.offers_niri_save().then(|| {
+                    button("Save for niri")
+                        .style(button::secondary)
+                        .on_press_maybe(self.can_save_niri().then_some(Message::SaveNiri))
+                }))
+                .spacing(12)
+                .align_y(iced::Alignment::Center),
         )
         .padding(12)
         .into()
@@ -1264,6 +1311,49 @@ mod tests {
             chord_key(&Key::Character("S")),
             Some(vnr_config::Key::Character('s'))
         );
+    }
+
+    fn frame(output: &str) -> Message {
+        Message::Preview(preview::Event::Frame {
+            output: output.to_owned(),
+            thumbnail: preview::Thumbnail {
+                width: 1,
+                height: 1,
+                rgba: vec![0, 0, 0, 255],
+            },
+        })
+    }
+
+    #[test]
+    fn the_demo_never_captures_the_screen() {
+        let mut app = demo_app();
+        press(&mut app, "p", true);
+        assert!(!app.previews);
+        assert!(app.status.contains("demo"), "{}", app.status);
+        let _ = app.update(frame("eDP-1"));
+        assert!(app.shots.is_empty());
+    }
+
+    #[test]
+    fn previews_toggle_and_give_up_when_unavailable() {
+        let mut app = demo_app();
+        app.options.demo = false;
+        press(&mut app, "Ctrl+p", false);
+        assert!(app.previews, "Ctrl+p applies even inside a text field");
+        let _ = app.update(frame("eDP-1"));
+        assert_eq!(app.shots.len(), 1);
+
+        let _ = app.update(Message::SetPreviews(false));
+        assert!(app.shots.is_empty(), "turning off forgets the pictures");
+        let _ = app.update(frame("eDP-1"));
+        assert!(app.shots.is_empty(), "a late picture is ignored");
+
+        let _ = app.update(Message::SetPreviews(true));
+        let _ = app.update(Message::Preview(preview::Event::Unavailable(
+            "no capture".to_owned(),
+        )));
+        assert!(!app.previews);
+        assert!(app.status.contains("no capture"), "{}", app.status);
     }
 
     #[test]

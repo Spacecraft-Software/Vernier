@@ -747,9 +747,10 @@ fn config_check_reports_defaults_overrides_and_problems() {
         "{error}"
     );
 
-    fs::write(&file, "{ overlays = false }\n").unwrap();
+    fs::write(&file, "{ overlays = false, previews = true }\n").unwrap();
     let off = sandbox.run(&["config", "check", "--json"]);
     assert_eq!(off.json()["data"]["overlays"], false, "{}", off.stderr);
+    assert_eq!(off.json()["data"]["previews"], true, "{}", off.stderr);
 
     let missing = sandbox.run(&["config", "check", "nope.ncl", "--json"]);
     assert_eq!(missing.error()["code"], "NOT_FOUND", "{}", missing.stderr);

@@ -191,6 +191,9 @@
 (define rust-bytemuck-derive-1.12.1
   (crate-source "bytemuck_derive" "1.12.1"
                 "17379imphax0d85jzkc50acw746mw89hjbrxqxlw1wmnhxjqj7va"))
+(define rust-byteorder-lite-0.1.0
+  (crate-source "byteorder-lite" "0.1.0"
+                "15alafmz4b9az56z6x7glcbcb6a8bfgyd109qc3bvx07zx4fj7wg"))
 (define rust-bytes-1.12.1
   (crate-source "bytes" "1.12.1"
                 "017z19dpg4f942h051m7bpnzcgng042hhcpd7bmg7bjjqd42lrgw"))
@@ -587,6 +590,9 @@
 (define rust-iced-winit-0.14.1
   (crate-source "iced_winit" "0.14.1"
                 "0wkznfn5vk9zmhif3cmly08haymv6fcsciw2d369j64mis68i2bm"))
+(define rust-image-0.25.10
+  (crate-source "image" "0.25.10"
+                "0131b9fsd5grxf3lchfs2ci0rg8ga2mh1ygai7k2zh1k8cwq1aw5"))
 (define rust-imbl-sized-chunks-0.1.3
   (crate-source "imbl-sized-chunks" "0.1.3"
                 "0bf2abqdcpzw7ma2hirh6w0nxf8ga41bvzmjay6jz9hqaq042hlg"))
@@ -656,6 +662,9 @@
 (define rust-jsonschema-value-0.59.0
   (crate-source "jsonschema-value" "0.59.0"
                 "12h7q834q2gjm28hyqqk6iybpim83zh4f2xdbrqpwy44g855b9z5"))
+(define rust-kamadak-exif-0.6.1
+  (crate-source "kamadak-exif" "0.6.1"
+                "0ds8k36qi88mzhx5fm1cgbxg0s4kmyiibmqpl5asvvvlfc6dhc0i"))
 (define rust-keccak-0.2.2
   (crate-source "keccak" "0.2.2"
                 "160myyi46qkh2fyldxzqd3sj97wx34fj14x4nm04j3kjvg8riwfq"))
@@ -770,9 +779,15 @@
 (define rust-micromap-0.3.0
   (crate-source "micromap" "0.3.0"
                 "0x4xsjpl9fzhchp7h83k8lbrcjrlcik4yh9wj6srafgd8qqnva62"))
+(define rust-moxcms-0.8.1
+  (crate-source "moxcms" "0.8.1"
+                "0jz4fd5f7pdn1rngqc96lxriqjkym1lswdhdbjr037s8p9ac31dv"))
 (define rust-mundy-0.2.3
   (crate-source "mundy" "0.2.3"
                 "0wqsjab3538cvzqq325cx5nc5m1q77vvi4swn37jppzj83dv0bpk"))
+(define rust-mutate-once-0.1.2
+  (crate-source "mutate_once" "0.1.2"
+                "1byj4yz6h0mdx3mmj0mq23ma59kw41pckspr2gz8rl22k0y27lhk"))
 (define rust-naga-27.0.3
   (crate-source "naga" "27.0.3"
                 "1n57m5hwi42mk57ljz7manc45b8ky8890891y86yw4cb1rgz4v06"))
@@ -1031,6 +1046,9 @@
 (define rust-profiling-1.0.18
   (crate-source "profiling" "1.0.18"
                 "1xdwlvxlgy99nn1dra7arzinkc8lbqljvcwpq70m7g16lda5wn9x"))
+(define rust-pxfm-0.1.30
+  (crate-source "pxfm" "0.1.30"
+                "1slrnbxd0nc96sny6x50ss1sm9ci0gig0fp1w8mw0pkgm5prapfm"))
 (define rust-quick-xml-0.41.0
   (crate-source "quick-xml" "0.41.0"
                 "1h9y8zry34r3mxfd5vqfj50vvvzvri4kzbx5d657jkqjalg4aq76"))
@@ -1701,6 +1719,7 @@
    rust-bytecount-0.6.9
    rust-bytemuck-1.25.2
    rust-bytemuck-derive-1.12.1
+   rust-byteorder-lite-0.1.0
    rust-bytes-1.12.1
    rust-calloop-0.13.0
    rust-calloop-0.14.5
@@ -1833,6 +1852,7 @@
    rust-iced-wgpu-0.14.0
    rust-iced-widget-0.14.2
    rust-iced-winit-0.14.1
+   rust-image-0.25.10
    rust-imbl-sized-chunks-0.1.3
    rust-indexmap-2.14.2
    rust-indoc-2.0.8
@@ -1856,6 +1876,7 @@
    rust-jsonschema-0.59.0
    rust-jsonschema-regex-0.59.0
    rust-jsonschema-value-0.59.0
+   rust-kamadak-exif-0.6.1
    rust-keccak-0.2.2
    rust-khronos-egl-6.0.0
    rust-khronos-api-3.1.0
@@ -1894,7 +1915,9 @@
    rust-memoffset-0.9.1
    rust-metal-0.32.0
    rust-micromap-0.3.0
+   rust-moxcms-0.8.1
    rust-mundy-0.2.3
+   rust-mutate-once-0.1.2
    rust-naga-27.0.3
    rust-ndk-0.9.0
    rust-ndk-context-0.1.1
@@ -1981,6 +2004,7 @@
    rust-proc-macro2-1.0.107
    rust-proc-macro2-diagnostics-0.10.1
    rust-profiling-1.0.18
+   rust-pxfm-0.1.30
    rust-quick-xml-0.41.0
    rust-quote-1.0.47
    rust-r-efi-5.3.0
