@@ -223,8 +223,9 @@ pub struct ApplyReport {
     /// The niri include file `--persist` wrote, or would write on a dry run.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub persisted: Option<WriteReport>,
-    /// With `--save`: whether the display server saved the change after its
-    /// own keep-or-revert dialog (only `true` appears; a refusal is `REVERTED`).
+    /// With `--save`: whether the display server was seen to save the change
+    /// after its own keep-or-revert dialog (`false`: kept on screen, save not
+    /// confirmed; a refusal is the `REVERTED` error).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub saved_by_server: Option<bool>,
 }

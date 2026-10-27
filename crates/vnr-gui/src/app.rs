@@ -278,9 +278,18 @@ fn save_niri(path: &Path, layout: &Layout) -> Result<(), String> {
         .map_err(|e| format!("cannot write {}: {e}", path.display()))
 }
 
-/// Has the server save `desired`; blocks until its own dialog is answered.
+/// Has the server save `desired`, which the editor believes is on screen;
+/// blocks until the server's own dialog is answered. Refuses when the
+/// displays changed since the editor read them, so a save never overwrites
+/// someone else's change, and tests first, as every apply does.
 fn save(backend: Option<BackendKind>, desired: &Layout) -> Result<Saved, String> {
     let mut backend = vnr_backends::open(backend).map_err(|e| e.to_string())?;
+    if backend.snapshot().map_err(|e| e.to_string())? != *desired {
+        return Err("the displays changed since the editor read them; press Reload".to_owned());
+    }
+    if backend.capabilities().test_only {
+        backend.test(desired).map_err(|e| e.to_string())?;
+    }
     backend.apply_and_save(desired).map_err(|e| e.to_string())
 }
 
@@ -789,6 +798,9 @@ impl App {
         self.status = match result {
             Ok(Saved::Kept) => "Saved. GNOME restores this layout at every login.".to_owned(),
             Ok(Saved::Restored) => "Not saved: GNOME restored the previous layout.".to_owned(),
+            Ok(Saved::Unverified) => "Kept on screen, but GNOME gave no sign it saved the layout; \
+                                      it may last only until you log out."
+                .to_owned(),
             Err(error) => format!("Not saved: {error}"),
         };
         self.reload_task()
@@ -1345,6 +1357,8 @@ mod tests {
         assert!(app.status.contains("restored"), "{}", app.status);
         let _ = app.update(Message::SavedServer(Ok(Saved::Kept)));
         assert!(app.status.starts_with("Saved."), "{}", app.status);
+        let _ = app.update(Message::SavedServer(Ok(Saved::Unverified)));
+        assert!(app.status.contains("no sign"), "{}", app.status);
     }
 
     #[test]

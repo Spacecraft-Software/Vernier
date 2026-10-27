@@ -536,7 +536,10 @@ GNOME then asks on screen whether to keep the new layout, in place of
 Vernier's prompt.  Choose @samp{Keep Changes} within 20 seconds and
 GNOME saves it in @file{~/.config/monitors.xml}; otherwise GNOME
 restores the previous layout and @command{vnr} exits with status 14
-(@code{REVERTED}).  GNOME's dialog needs someone at the screen, so
+(@code{REVERTED}).  If the new layout stays up but Vernier sees no
+sign that GNOME wrote the file, it keeps the change and warns
+(@code{NOT_PERSISTENT}) rather than claim a save.  GNOME's dialog needs
+someone at the screen, so
 @option{--save} refuses @option{--yes}.  KDE Plasma saves every change
 by itself, so @option{--save} changes nothing there; other backends
 report it as unsupported.

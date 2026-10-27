@@ -14,6 +14,9 @@ pub enum Saved {
     /// The user refused it, or did not answer in time, and the server
     /// restored the previous configuration.
     Restored,
+    /// The new configuration stayed on screen, but the server gave no sign
+    /// that it saved it; it may last only until the session ends.
+    Unverified,
 }
 
 /// A connection to a display server that can read and change outputs.

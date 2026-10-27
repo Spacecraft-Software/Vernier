@@ -646,8 +646,8 @@ fn save_supported(out: &Out, kind: BackendKind, caps: Capabilities) -> Result<bo
 }
 
 /// Applies `desired` through the server's own confirmation and saves it.
-/// Returns whether it was saved; a refusal is the `REVERTED` error, as when
-/// Vernier's own prompt goes unanswered.
+/// Returns whether the save was seen; a refusal is the `REVERTED` error, as
+/// when Vernier's own prompt goes unanswered.
 fn save_on_server(
     out: &Out,
     backend: &mut dyn Backend,
@@ -671,6 +671,15 @@ fn save_on_server(
                 None,
             );
             Ok(true)
+        }
+        Saved::Unverified => {
+            out.diag(
+                Severity::Warn,
+                "NOT_PERSISTENT",
+                "the configuration stayed on screen, but the display server gave no sign that it saved it",
+                Some("ls -l ~/.config/monitors.xml"),
+            );
+            Ok(false)
         }
         Saved::Restored => Err(AppError::new(
             ErrorCode::Reverted,
