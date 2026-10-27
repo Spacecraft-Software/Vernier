@@ -4,11 +4,20 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 
 ## Unreleased
 
+### Changed
+
+- Release builds optimize for size (`opt-level = "s"`), keeping level 3 for
+  the software renderer and the editor: 26.4 MB down to 20.4 MB. Measured
+  before and after: `output list` 3.2 ms both, `layout export` 3.0 and
+  2.8 ms, `config check` 14.2 and 16.0 ms. CI now fails a release binary of
+  22 MB or more (VNR-SRS-112).
+
 ### Fixed
 
 - `vnr gui` names any run-time library it cannot load (`libwayland-client`;
-  `libX11`, `libX11-xcb`, `libXcursor`, `libXi`; `libxkbcommon`) and exits 17, `LIBRARY_MISSING`, with a hint
-  (on NixOS, building the Nix package) instead of an internal error.
+  `libX11`, `libX11-xcb`, `libXcursor`, `libXi`; `libxkbcommon`) and exits
+  17, `LIBRARY_MISSING`, with a hint (on NixOS, building the Nix package)
+  instead of an internal error.
 - `vnr gui` with no reachable compositor or X server exits 10,
   `BACKEND_UNAVAILABLE`, instead of reporting an internal error. A panic now
   exits with the reported error's code.

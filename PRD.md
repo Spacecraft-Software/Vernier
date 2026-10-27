@@ -186,7 +186,7 @@ Vernier is Category C under the Steelbore Standard: a bad configuration is visib
 - [x] **Short code.** `VNR`, matching the binary; requirement identifiers are `VNR-SRS-NNN` (decided 2026-10-22).
 - [x] **Configuration language.** Nickel for settings (`config.ncl`), TOML for profiles (decided 2026-10-21).
 - [x] **Persistence on niri.** Only on request: `--persist FILE` on `output set` and `profile apply`, and Save for niri in the editor (decided 2026-10-21).
-- [ ] **Budgets.** Confirm or change the proposed ceilings in VNR-SRS-110 to 113. The release binary measured 28.8 MB on 2026-10-22 (Nickel and the screen-label text stack), over the 16 MB draft in VNR-SRS-112.
+- [ ] **Budgets.** Confirm or change the proposed ceilings in VNR-SRS-110, 111 and 113 (benchmarks on the reference machine). VNR-SRS-112 was set to 22 MB on 2026-10-26: the size-optimized release binary measures 20.4 MB, and the 16 MB draft would have meant dropping the GPU renderer or Nickel.
 - [x] **Accessibility path.** Wait for AccessKit in upstream iced; the CLI stays the accessible path until then (decided 2026-10-21).
 - [ ] **Backend order.** X11 (M2) before KDE (M3) and GNOME (M4), or the other way round?
 - [ ] **Upstream.** Propose the COSMIC mirroring semantics for wlr-output-management upstream, or stay a consumer?

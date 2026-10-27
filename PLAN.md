@@ -20,7 +20,7 @@ MVP: M0–M7 — Vernier v1.0
 - [x] P-011 iced editor: drag with snapping, properties panel, problems list
 - [x] P-012 Steelbore theme with §11.6 resolution and §18.1 accessible toggle
 - [x] P-013 End-to-end test against headless sway (`crates/vnr-wlr/tests/sway_headless.rs`, in CI)
-- [ ] P-014 Verify on niri (real hardware)
+- [x] P-014 Verify on niri (real hardware): Steelbore OS Bravais, ThinkPad T490s eDP-1, 2026-10-26; rotation with confirm, Save for niri, screen contents through `wlr-screencopy`
 - [ ] P-015 Verify on COSMIC (real hardware), including mirroring
 - [ ] P-016 Live change tracking (re-read state on compositor `done` events)
 - [ ] P-036 CLI Standard v1.1 conformance (see TODO.md)
