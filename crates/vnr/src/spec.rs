@@ -53,7 +53,7 @@ pub const GLOBAL_FLAGS: [&str; 15] = [
 ];
 
 /// Diagnostic codes `vnr` emits besides errors.
-pub const DIAGNOSTICS: [(&str, &str, &str); 10] = [
+pub const DIAGNOSTICS: [(&str, &str, &str); 12] = [
     ("APPLIED", "ok", "a configuration was applied"),
     (
         "KEPT",
@@ -61,6 +61,16 @@ pub const DIAGNOSTICS: [(&str, &str, &str); 10] = [
         "a configuration was confirmed on the terminal",
     ),
     ("WRITTEN", "ok", "a file was written"),
+    (
+        "SAVED",
+        "ok",
+        "the display server saved a configuration after its own confirmation",
+    ),
+    (
+        "CONFIRM_ON_SCREEN",
+        "info",
+        "the display server is showing its own keep-or-revert dialog",
+    ),
     ("UNCHANGED", "info", "nothing needed to change"),
     (
         "LAYOUT_WARNING",

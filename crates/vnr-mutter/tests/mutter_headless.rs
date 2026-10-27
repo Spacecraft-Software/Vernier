@@ -12,11 +12,17 @@
 //!
 //! The test first applies a known layout, so it can run repeatedly against
 //! the same Mutter.
+//!
+//! With `VNR_MUTTER_TEST_CONFIG` naming the `XDG_CONFIG_HOME` Mutter was
+//! started with (a scratch directory, never your own), it also saves a
+//! layout: plain Mutter has no shell to ask, so it confirms at once and
+//! writes `monitors.xml` there. `scripts/test-servers.sh mutter` sets both.
 
-use vnr_core::{Backend, Layout, Mode, Position, Scale, Transform};
+use vnr_core::{Backend, Layout, Mode, Position, Saved, Scale, Transform};
 use vnr_mutter::MutterBackend;
 
 const BUS_ENV: &str = "VNR_MUTTER_TEST_BUS";
+const CONFIG_ENV: &str = "VNR_MUTTER_TEST_CONFIG";
 
 fn connect() -> MutterBackend {
     let bus = std::env::var(BUS_ENV)
@@ -130,4 +136,19 @@ fn display_config_round_trips() {
         assert!(backend.apply(&fractional).unwrap_err().is_unsupported());
     }
     assert_eq!(backend.snapshot().unwrap(), base);
+
+    // Saving: plain Mutter confirms at once and writes monitors.xml.
+    assert!(caps.save_on_request);
+    if let Some(config) = std::env::var_os(CONFIG_ENV) {
+        let file = std::path::Path::new(&config).join("monitors.xml");
+        let turned = edit(&base, &b, |o| o.transform = Transform::Rotate90);
+        assert_eq!(backend.apply_and_save(&turned).unwrap(), Saved::Kept);
+        let saved = backend.snapshot().unwrap();
+        assert_eq!(saved.get(&b).unwrap().transform, Transform::Rotate90);
+        let xml = std::fs::read_to_string(&file).expect("Mutter wrote monitors.xml");
+        assert!(xml.contains(&b), "{xml}");
+        apply(&mut backend, &base);
+    } else {
+        eprintln!("{CONFIG_ENV} is not set; skipping the save check");
+    }
 }

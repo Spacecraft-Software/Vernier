@@ -12,18 +12,25 @@
 //!   [`Backend::test`] asks Mutter; with method *temporary* it applies.
 //! - Mirroring is several monitors in one logical monitor.
 //!
-//! Vernier applies *temporarily*: a *persistent* apply makes GNOME Shell
-//! show its own keep-or-revert dialog, which would double Vernier's prompt
-//! and revert `--yes` changes after 20 seconds. Changes therefore last until
-//! the session ends; GNOME Settings makes them permanent.
+//! [`Backend::apply`] applies *temporarily*, so Vernier's own
+//! keep-or-revert prompt guards it and the change lasts until the session
+//! ends. [`Backend::apply_and_save`] applies *persistently*: Mutter then
+//! restores the previous configuration after 20 seconds unless the shell
+//! confirms, and GNOME Shell asks the user with its own dialog. No D-Bus
+//! call confirms on the user's behalf, so a saved change always passes
+//! through that dialog, and Vernier does not prompt as well. Plain Mutter
+//! without a shell confirms at once. `CONFIRM_WINDOW` covers Mutter's
+//! timeout.
 
 // Rust guideline compliant 2026-10-20
 
 mod state;
 
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::time::{Duration, Instant, SystemTime};
 
-use vnr_core::{Backend, BackendError, BackendKind, Capabilities, Layout};
+use vnr_core::{Backend, BackendError, BackendKind, Capabilities, Layout, Saved};
 use zbus::blocking::Connection;
 use zbus::zvariant::{OwnedValue, Value};
 
@@ -36,6 +43,14 @@ const INTERFACE: &str = "org.gnome.Mutter.DisplayConfig";
 /// `ApplyMonitorsConfig` methods.
 const METHOD_VERIFY: u32 = 0;
 const METHOD_TEMPORARY: u32 = 1;
+const METHOD_PERSISTENT: u32 = 2;
+
+/// How long Mutter waits for the shell to confirm a persistent change
+/// (`DEFAULT_DISPLAY_CONFIGURATION_TIMEOUT` in Mutter 50), plus a margin
+/// for the restore to land.
+const CONFIRM_WINDOW: Duration = Duration::from_secs(20 + 5);
+/// How often to look for the user's answer while the dialog is up.
+const POLL: Duration = Duration::from_millis(250);
 
 /// Mutter's `layout-mode` value for physical layout.
 const LAYOUT_PHYSICAL: u32 = 2;
@@ -141,6 +156,7 @@ impl Backend for MutterBackend {
             fractional_scale: !self.state.physical,
             test_only: true,
             persistent: false,
+            save_on_request: true,
         }
     }
 
@@ -156,6 +172,83 @@ impl Backend for MutterBackend {
     fn apply(&mut self, desired: &Layout) -> Result<(), BackendError> {
         self.send(desired, METHOD_TEMPORARY)
     }
+
+    /// Mutter does not say how the shell's dialog was answered, so this
+    /// watches for its effects. Keeping writes `monitors.xml`; restoring
+    /// puts the previous layout back on screen (Mutter's serial does not
+    /// change for a restore, only when it re-reads the hardware). Any other
+    /// layout means something else changed the monitors meanwhile. When
+    /// Mutter's timeout passes with the new layout still up but no file
+    /// written (another `XDG_CONFIG_HOME`, or a failed write), the save is
+    /// [`Saved::Unverified`]: silence is not proof.
+    fn apply_and_save(&mut self, desired: &Layout) -> Result<Saved, BackendError> {
+        let file = monitors_file();
+        let written_before = file.as_ref().and_then(|f| modified(f));
+        let previous = read(&self.conn)?.to_layout();
+        self.send(desired, METHOD_PERSISTENT)?;
+        let applied = self.state.to_layout();
+        let started = Instant::now();
+        loop {
+            std::thread::sleep(POLL);
+            let written = file.as_ref().and_then(|f| modified(f)) != written_before;
+            self.state = read(&self.conn)?;
+            let now = self.state.to_layout();
+            let seen = if now == applied {
+                Seen::Applied
+            } else if now == previous {
+                Seen::Previous
+            } else {
+                Seen::Other
+            };
+            match verdict(written, seen, started.elapsed() >= CONFIRM_WINDOW) {
+                Some(Ok(answer)) => return Ok(answer),
+                Some(Err(())) => {
+                    return Err(BackendError::cancelled(
+                        "the monitors changed in another way while GNOME's dialog was open; read them again",
+                    ));
+                }
+                None => {}
+            }
+        }
+    }
+}
+
+/// Which layout is on screen while the dialog is up.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Seen {
+    /// The one Vernier sent (also when it equals the previous one).
+    Applied,
+    /// The one from before.
+    Previous,
+    /// Neither: something else changed the monitors.
+    Other,
+}
+
+/// The user's answer from what has happened so far, `Err` when the
+/// monitors changed in some other way, or `None` while still waiting.
+/// Mutter writes the file only when the shell confirms.
+const fn verdict(written: bool, seen: Seen, timed_out: bool) -> Option<Result<Saved, ()>> {
+    match (written, seen, timed_out) {
+        (true, Seen::Applied, _) => Some(Ok(Saved::Kept)),
+        (_, Seen::Previous, _) => Some(Ok(Saved::Restored)),
+        (_, Seen::Other, _) => Some(Err(())),
+        (false, Seen::Applied, true) => Some(Ok(Saved::Unverified)),
+        (false, Seen::Applied, false) => None,
+    }
+}
+
+/// Where Mutter saves the configuration: `monitors.xml` in the user's
+/// configuration directory.
+fn monitors_file() -> Option<PathBuf> {
+    let config = std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
+    Some(config.join("monitors.xml"))
+}
+
+fn modified(path: &std::path::Path) -> Option<SystemTime> {
+    std::fs::metadata(path).and_then(|m| m.modified()).ok()
 }
 
 /// Calls `GetCurrentState` and converts the reply.
@@ -262,6 +355,22 @@ fn dbus_error(error: zbus::Error) -> BackendError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_answer_follows_what_mutter_did() {
+        assert_eq!(verdict(false, Seen::Applied, false), None, "still waiting");
+        assert_eq!(verdict(true, Seen::Applied, false), Some(Ok(Saved::Kept)));
+        assert_eq!(
+            verdict(false, Seen::Previous, false),
+            Some(Ok(Saved::Restored))
+        );
+        assert_eq!(verdict(false, Seen::Other, false), Some(Err(())));
+        assert_eq!(
+            verdict(false, Seen::Applied, true),
+            Some(Ok(Saved::Unverified)),
+            "silence past the timeout is not proof of a save"
+        );
+    }
 
     #[test]
     fn missing_bus_is_unavailable() {

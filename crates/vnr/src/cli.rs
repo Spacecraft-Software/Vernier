@@ -356,6 +356,12 @@ pub struct SetArgs {
     #[arg(long, value_name = "FILE")]
     #[schemars(with = "Option<String>", length(min = 1, max = 4096))]
     pub persist: Option<PathBuf>,
+    /// Have GNOME save the change so it outlasts the session: GNOME shows its
+    /// own keep-or-revert dialog in place of Vernier's prompt, and restores the
+    /// previous configuration unless someone answers Keep within 20 seconds.
+    #[arg(long, conflicts_with_all = ["persist", "timeout"])]
+    #[schemars(default)]
+    pub save: bool,
 }
 
 /// Arguments of `vnr profile save`.
@@ -382,6 +388,12 @@ pub struct ApplyArgs {
     #[arg(long, value_name = "FILE")]
     #[schemars(with = "Option<String>", length(min = 1, max = 4096))]
     pub persist: Option<PathBuf>,
+    /// Have GNOME save the change so it outlasts the session: GNOME shows its
+    /// own keep-or-revert dialog in place of Vernier's prompt, and restores the
+    /// previous configuration unless someone answers Keep within 20 seconds.
+    #[arg(long, conflicts_with_all = ["persist", "timeout"])]
+    #[schemars(default)]
+    pub save: bool,
 }
 
 /// Configuration languages, for the schema.

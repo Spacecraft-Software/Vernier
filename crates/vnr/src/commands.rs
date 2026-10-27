@@ -18,8 +18,8 @@ use std::time::{Duration, Instant};
 use serde_json::Value;
 use vnr_core::geometry::{normalize, resolve_overlap};
 use vnr_core::{
-    Backend, BackendKind, Layout, Output, Position, Profile, Severity as IssueSeverity, export,
-    validate,
+    Backend, BackendKind, Capabilities, Layout, Output, Position, Profile, Saved,
+    Severity as IssueSeverity, export, validate,
 };
 
 use crate::cli::{
@@ -393,6 +393,7 @@ fn output_set(out: &Out, global: &Global, args: &SetArgs) -> Result<(), AppError
         global,
         args.timeout,
         args.persist.as_deref(),
+        args.save,
         |current| set(current, args),
     )
 }
@@ -404,6 +405,7 @@ fn profile_apply(out: &Out, global: &Global, args: &ApplyArgs) -> Result<(), App
         global,
         args.timeout,
         args.persist.as_deref(),
+        args.save,
         |current| {
             profile
                 .resolve(current)
@@ -465,12 +467,21 @@ fn change(
     global: &Global,
     timeout: u64,
     persist: Option<&Path>,
+    save: bool,
     build: impl FnOnce(&Layout) -> Result<Layout, AppError>,
 ) -> Result<(), AppError> {
+    if save && global.yes {
+        return Err(AppError::new(
+            ErrorCode::InvalidArgument,
+            "`--save` waits for the display server's own keep-or-revert dialog, which `--yes` cannot answer",
+            out.command.replace(" --yes", ""),
+        ));
+    }
     // Refuse a bad `--persist` target before anything on screen changes.
     let persist = persist.map(|p| persist_target(out, p)).transpose()?;
     let mut backend = open(out, global.backend)?;
     let caps = backend.capabilities();
+    let save = save && save_supported(out, backend.kind(), caps)?;
     let before = snapshot(backend.as_mut())?;
     let desired = build(&before)?;
     let changes = diff(&before, &desired);
@@ -484,6 +495,7 @@ fn change(
         accepted_by_backend: None,
         persistent: caps.persistent,
         persisted: None,
+        saved_by_server: None,
     };
 
     for issue in found
@@ -493,7 +505,9 @@ fn change(
         out.diag(Severity::Warn, "LAYOUT_WARNING", &issue.to_string(), None);
     }
     let has_errors = found.iter().any(|i| i.severity() == IssueSeverity::Error);
-    if report.changes.is_empty() {
+    // Saving an unchanged layout still has the server save it.
+    let saving = save && !out.dry_run;
+    if report.changes.is_empty() && !saving {
         report.outcome = "unchanged".into();
         out.diag(Severity::Info, "UNCHANGED", "nothing needs to change", None);
         report.persisted = persist
@@ -531,6 +545,11 @@ fn change(
         ));
     }
 
+    if save {
+        report.saved_by_server = Some(save_on_server(out, backend.as_mut(), &desired)?);
+        report.outcome = "kept".into();
+        return emit_report(out, &report);
+    }
     backend.apply(&desired).map_err(|e| AppError::backend(&e))?;
     announce(out, &report);
     let interactive = out.mode() == Mode::Human
@@ -547,10 +566,17 @@ fn change(
     report.persisted = persist
         .map(|p| write_persist(out, &p, &desired))
         .transpose()?;
-    if report.persisted.is_none()
-        && !caps.persistent
-        && matches!(backend.kind(), BackendKind::Wlr | BackendKind::Cosmic)
-    {
+    warn_forgotten(out, backend.kind(), caps, &report);
+    emit_report(out, &report)
+}
+
+/// Warns when the kept change will not outlast a compositor restart or the
+/// session, with the command that would make it last.
+fn warn_forgotten(out: &Out, kind: BackendKind, caps: Capabilities, report: &ApplyReport) {
+    if report.persisted.is_some() || caps.persistent {
+        return;
+    }
+    if matches!(kind, BackendKind::Wlr | BackendKind::Cosmic) {
         out.diag(
             Severity::Warn,
             "NOT_PERSISTENT",
@@ -561,8 +587,106 @@ fn change(
                 export::NIRI_INCLUDE_FILE
             )),
         );
+    } else if caps.save_on_request {
+        out.diag(
+            Severity::Warn,
+            "NOT_PERSISTENT",
+            "the display server forgets this change when the session ends",
+            Some(&format!("{} --save", without_keep_flags(&out.command))),
+        );
     }
-    emit_report(out, &report)
+}
+
+/// `command` without the flags `--save` rejects (`--yes`, `--timeout N`).
+fn without_keep_flags(command: &str) -> String {
+    let mut words = command.split(' ');
+    let mut kept = Vec::new();
+    while let Some(word) = words.next() {
+        match word {
+            "--yes" | "-y" => {}
+            "--timeout" => {
+                words.next();
+            }
+            w if w.starts_with("--timeout=") => {}
+            w => kept.push(w),
+        }
+    }
+    kept.join(" ")
+}
+
+/// Whether `--save` should go to the server: yes when it saves on request;
+/// no, with a note, when it saves every change anyway; an error otherwise.
+fn save_supported(out: &Out, kind: BackendKind, caps: Capabilities) -> Result<bool, AppError> {
+    if caps.save_on_request {
+        return Ok(true);
+    }
+    if caps.persistent {
+        out.diag(
+            Severity::Info,
+            "RESOLVED",
+            &format!("the {kind} backend saves every change itself; `--save` changes nothing"),
+            None,
+        );
+        return Ok(false);
+    }
+    let hint = if matches!(kind, BackendKind::Wlr | BackendKind::Cosmic) {
+        format!(
+            "{} --persist ~/.config/niri/{}",
+            out.command.replace(" --save", ""),
+            export::NIRI_INCLUDE_FILE
+        )
+    } else {
+        "vnr backend get --json".to_owned()
+    };
+    Err(AppError::new(
+        ErrorCode::Unsupported,
+        format!("the {kind} backend cannot save a configuration on request"),
+        hint,
+    ))
+}
+
+/// Applies `desired` through the server's own confirmation and saves it.
+/// Returns whether the save was seen; a refusal is the `REVERTED` error, as
+/// when Vernier's own prompt goes unanswered.
+fn save_on_server(
+    out: &Out,
+    backend: &mut dyn Backend,
+    desired: &Layout,
+) -> Result<bool, AppError> {
+    out.diag(
+        Severity::Info,
+        "CONFIRM_ON_SCREEN",
+        "the display server is asking on screen whether to keep this configuration; answer Keep within 20 seconds to save it",
+        None,
+    );
+    match backend
+        .apply_and_save(desired)
+        .map_err(|e| AppError::backend(&e))?
+    {
+        Saved::Kept => {
+            out.diag(
+                Severity::Ok,
+                "SAVED",
+                "the display server saved the configuration; it returns at every login",
+                None,
+            );
+            Ok(true)
+        }
+        Saved::Unverified => {
+            out.diag(
+                Severity::Warn,
+                "NOT_PERSISTENT",
+                "the configuration stayed on screen, but the display server gave no sign that it saved it",
+                Some("ls -l ~/.config/monitors.xml"),
+            );
+            Ok(false)
+        }
+        Saved::Restored => Err(AppError::new(
+            ErrorCode::Reverted,
+            "the change was not kept in the display server's dialog, so it restored the previous configuration",
+            out.command.clone(),
+        )),
+    }
 }
 
 /// Checks a `--persist` file: inside the allowed roots, not niri's main

@@ -887,3 +887,118 @@ fn no_color_keeps_escapes_out_even_when_forced_elsewhere() {
     );
     assert!(!out.stdout.contains('\u{1b}') && !out.stderr.contains('\u{1b}'));
 }
+
+// --- Saving through the display server (GNOME) ----------------------------
+
+/// The fixture, standing in for a server that saves on request, as GNOME does.
+fn saving_fixture(refuse: bool) -> String {
+    let caps = r#"{"capabilities":{"mirroring":true,"adaptive_sync":true,"adaptive_sync_automatic":true,"primary":true,"custom_modes":false,"fractional_scale":true,"test_only":true,"persistent":false,"save_on_request":true},"#;
+    let fixture = FIXTURE.replacen('{', caps, 1);
+    if refuse {
+        fixture.replacen('{', "{\"refuse_save\":true,", 1)
+    } else {
+        fixture
+    }
+}
+
+fn scale_of(sandbox: &Sandbox, name: &str) -> f64 {
+    let fixture: Value = serde_json::from_str(&fs::read_to_string(sandbox.fixture()).unwrap())
+        .expect("fixture is JSON");
+    fixture["outputs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|o| o["name"] == name)
+        .unwrap()["scale"]
+        .as_f64()
+        .unwrap()
+}
+
+#[test]
+fn save_hands_confirmation_to_the_server() {
+    let sandbox = Sandbox::with_fixture(&saving_fixture(false));
+    let out = sandbox.run(&[
+        "output",
+        "set",
+        "DP-1",
+        "--scale",
+        "2",
+        "--save",
+        "--verbose",
+    ]);
+    assert_eq!(out.code, 0, "{}", out.stderr);
+    let data = &out.json()["data"];
+    assert_eq!(data["outcome"], "kept");
+    assert_eq!(data["saved_by_server"], true);
+    let codes: Vec<Value> = out
+        .diagnostics()
+        .iter()
+        .map(|d| d["code"].clone())
+        .collect();
+    assert!(codes.contains(&"CONFIRM_ON_SCREEN".into()), "{codes:?}");
+    assert!(codes.contains(&"SAVED".into()), "{codes:?}");
+    assert!(
+        !codes.contains(&"KEPT".into()),
+        "Vernier must not prompt as well"
+    );
+    assert!((scale_of(&sandbox, "DP-1") - 2.0).abs() < f64::EPSILON);
+}
+
+#[test]
+fn a_refused_save_is_reverted_and_changes_nothing() {
+    let sandbox = Sandbox::with_fixture(&saving_fixture(true));
+    let out = sandbox.run(&["output", "set", "DP-1", "--scale", "2", "--save"]);
+    assert_eq!(out.code, 14, "{}", out.stderr);
+    assert_eq!(out.error()["code"], "REVERTED");
+    assert!((scale_of(&sandbox, "DP-1") - 1.0).abs() < f64::EPSILON);
+}
+
+#[test]
+fn save_refuses_yes_and_persist_and_servers_that_cannot_save() {
+    let sandbox = Sandbox::with_fixture(&saving_fixture(false));
+    let yes = sandbox.run(&["output", "set", "DP-1", "--scale", "2", "--save", "--yes"]);
+    assert_eq!(yes.code, 2, "{}", yes.stderr);
+    assert_eq!(yes.error()["hint"], "vnr output set DP-1 --scale 2 --save");
+    let both = sandbox.run(&[
+        "output",
+        "set",
+        "DP-1",
+        "--scale",
+        "2",
+        "--save",
+        "--persist",
+        "x.kdl",
+    ]);
+    assert_eq!(both.code, 2, "{}", both.stderr);
+    assert!((scale_of(&sandbox, "DP-1") - 1.0).abs() < f64::EPSILON);
+
+    let plain = Sandbox::new();
+    let out = plain.run(&["output", "set", "DP-1", "--scale", "2", "--save"]);
+    assert_eq!(out.code, 11, "{}", out.stderr);
+    assert_eq!(out.error()["code"], "UNSUPPORTED");
+    assert_eq!(out.error()["hint"], "vnr backend get --json");
+}
+
+#[test]
+fn a_change_the_server_could_save_points_at_save() {
+    let sandbox = Sandbox::with_fixture(&saving_fixture(false));
+    let out = sandbox.run(&[
+        "output",
+        "set",
+        "DP-1",
+        "--scale",
+        "2",
+        "--timeout",
+        "30",
+        "--yes",
+    ]);
+    assert_eq!(out.code, 0, "{}", out.stderr);
+    let warning = out
+        .diagnostics()
+        .into_iter()
+        .find(|d| d["code"] == "NOT_PERSISTENT")
+        .expect("a NOT_PERSISTENT warning");
+    assert_eq!(warning["hint"], "vnr output set DP-1 --scale 2 --save");
+    let backend = sandbox.run(&["backend", "get", "--json"]);
+    assert_eq!(backend.json()["data"]["save_on_request"], true);
+}

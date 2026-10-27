@@ -46,7 +46,7 @@ mod profile;
 mod validate;
 
 #[doc(inline)]
-pub use backend::Backend;
+pub use backend::{Backend, Saved};
 #[doc(inline)]
 pub use error::{BackendError, ParseError, ProfileError};
 #[doc(inline)]

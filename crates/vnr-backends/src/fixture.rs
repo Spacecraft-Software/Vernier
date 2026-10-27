@@ -6,6 +6,9 @@
 //!
 //! The file is named by `VNR_FIXTURE` and holds a [`Fixture`]. `snapshot`
 //! reads it, `apply` writes the new layout back, and `test` only checks it.
+//! With `save_on_request` among its capabilities, `apply_and_save` stands
+//! in for GNOME: it keeps the change, or restores the previous one when
+//! `refuse_save` is set, as a user answering the server's dialog would.
 //! Integration tests drive the real `vnr` binary against such a file, so
 //! every command path is exercised without a compositor.
 
@@ -14,7 +17,7 @@ use std::io;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
-use vnr_core::{Backend, BackendError, BackendKind, Capabilities, Layout};
+use vnr_core::{Backend, BackendError, BackendKind, Capabilities, Layout, Saved};
 
 /// Environment variable naming the fixture file.
 pub const FIXTURE_ENV: &str = "VNR_FIXTURE";
@@ -30,6 +33,10 @@ pub struct Fixture {
     /// refusing a configuration would.
     #[serde(default)]
     pub reject: bool,
+    /// When true, `apply_and_save` answers as a user refusing the server's
+    /// keep-or-revert dialog would: the previous outputs stay.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub refuse_save: bool,
     /// The current outputs.
     #[serde(flatten)]
     pub layout: Layout,
@@ -45,6 +52,7 @@ fn full_capabilities() -> Capabilities {
         fractional_scale: true,
         test_only: true,
         persistent: false,
+        save_on_request: false,
     }
 }
 
@@ -118,5 +126,19 @@ impl Backend for FixtureBackend {
         })?;
         self.fixture = next;
         Ok(())
+    }
+
+    fn apply_and_save(&mut self, desired: &Layout) -> Result<Saved, BackendError> {
+        if !self.fixture.capabilities.save_on_request {
+            return Err(BackendError::unsupported(
+                "the fixture cannot save a configuration on request",
+            ));
+        }
+        if self.fixture.refuse_save {
+            self.check()?;
+            return Ok(Saved::Restored);
+        }
+        self.apply(desired)?;
+        Ok(Saved::Kept)
     }
 }

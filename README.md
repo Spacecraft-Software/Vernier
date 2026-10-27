@@ -33,7 +33,7 @@ Pre-release (0.1.0). Milestone progress is tracked in [`PLAN.md`](PLAN.md).
 | `wlr` | niri, sway, Hyprland, river, labwc, Wayfire | Working; tested against headless sway |
 | `cosmic` | COSMIC (wlr + `zcosmic_output_manager_v1` v3) | Implemented; not yet tested on COSMIC |
 | `kde` | KDE Plasma (`kde-output-management-v2`) | Working; tested against headless KWin 5.27 and on Plasma 6 (ThinkPad T490s). Mirroring (Plasma 6.3+) unverified |
-| `mutter` | GNOME (`org.gnome.Mutter.DisplayConfig`) | Working; tested against headless Mutter 46. Changes last until logout |
+| `mutter` | GNOME (`org.gnome.Mutter.DisplayConfig`) | Working; tested against headless Mutter 46. Changes last until logout unless saved with `--save` (GNOME's own Keep dialog) |
 | `x11` | Any X11 session (`RandR` 1.3+) | Working; tested against the Xorg dummy driver and on a ThinkPad T490s (Intel). Custom modes pending |
 
 ## What it does better than the originals
@@ -54,6 +54,8 @@ Pre-release (0.1.0). Milestone progress is tracked in [`PLAN.md`](PLAN.md).
   to a change, or press Save for niri in the editor, and the kept layout lands
   in a file niri's config includes; Vernier never edits `config.kdl` itself.
   `vnr layout export` also speaks sway, kanshi, shikane and home-manager.
+  On GNOME, `--save` (or Save for GNOME) has GNOME save the layout for every
+  login, after its own Keep Changes dialog.
 - **Mirroring on COSMIC**, through COSMIC's own protocol extension.
 - **Screens that say which they are.** While the editor is open, each screen
   shows its output name in a corner, and the selected output's label is

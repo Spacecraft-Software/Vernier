@@ -111,6 +111,7 @@ Prefix every identifier with `VNR-SRS-` when citing it outside this table.
 | VNR-SRS-015 | Vernier shall choose a backend from the session and shall accept `--backend` or `VNR_BACKEND` to override it. | Detection can guess wrong on nested or unusual sessions. | VNR-NEED-001 | mandatory | Test | verified |
 | VNR-SRS-016 | Each backend shall report its capabilities, and the editor shall hide controls the backend cannot apply. | A control that cannot work misleads the user. | VNR-NEED-002 | mandatory | Test | verified |
 | VNR-SRS-017 | The editor shall refresh its view when the server reports an output change made elsewhere. | ARandR went stale while it ran. | VNR-NEED-001 | expected | Demonstration | baselined |
+| VNR-SRS-018 | On request (`--save`, Save for GNOME), Vernier shall save a configuration through Mutter's persistent method, leaving the keep-or-revert prompt to GNOME Shell instead of its own, and shall report whether it was kept or restored; VNR-SRS-005's own prompt does not apply to such a save. | Mutter reverts a persistent change after 20 s unless the shell confirms, and no D-Bus call confirms; two prompts would confuse. | VNR-NEED-004 | expected | Test (headless Mutter, fixture) + demonstration on GNOME | implemented |
 
 ### Profiles and export
 

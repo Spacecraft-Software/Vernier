@@ -342,6 +342,7 @@ impl Backend for X11Backend {
             fractional_scale: self.can_scale,
             test_only: false,
             persistent: false,
+            save_on_request: false,
         }
     }
 

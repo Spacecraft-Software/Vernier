@@ -351,6 +351,7 @@ impl Backend for WlrBackend {
             fractional_scale: true,
             test_only: true,
             persistent: false,
+            save_on_request: false,
         }
     }
 
