@@ -146,7 +146,16 @@ fn display_config_round_trips() {
         let saved = backend.snapshot().unwrap();
         assert_eq!(saved.get(&b).unwrap().transform, Transform::Rotate90);
         let xml = std::fs::read_to_string(&file).expect("Mutter wrote monitors.xml");
-        assert!(xml.contains(&b), "{xml}");
+        // The saved logical monitor holding `b` must carry the rotation
+        // (Mutter writes a 90° turn as `left`), not just name the monitor.
+        let saved_b = xml
+            .split("<logicalmonitor>")
+            .find(|block| block.contains(&format!("<connector>{b}</connector>")))
+            .unwrap_or_else(|| panic!("{b} is not in monitors.xml: {xml}"));
+        assert!(
+            saved_b.contains("<rotation>left</rotation>"),
+            "{b} was saved without its rotation: {xml}"
+        );
         apply(&mut backend, &base);
     } else {
         eprintln!("{CONFIG_ENV} is not set; skipping the save check");
