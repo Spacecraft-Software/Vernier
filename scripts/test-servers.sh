@@ -118,6 +118,10 @@ kwin)
 	VNR_KDE_TEST_DISPLAY=vnr-kwin run_test vnr-kde kwin_virtual
 	;;
 mutter)
+	# Mutter saves `monitors.xml` here; keep it away from the real one.
+	XDG_CONFIG_HOME=$runtime/config
+	export XDG_CONFIG_HOME
+	mkdir -p "$XDG_CONFIG_HOME"
 	bus=$(dbus-daemon --session --fork --print-address=1 --print-pid=1 >"$runtime/bus" && head -n 1 "$runtime/bus")
 	pids="$pids $(sed -n 2p "$runtime/bus")"
 	DBUS_SESSION_BUS_ADDRESS=$bus mutter --headless --wayland --no-x11 \
@@ -127,7 +131,8 @@ mutter)
 	wait_for "DisplayConfig on the bus" env DBUS_SESSION_BUS_ADDRESS="$bus" \
 		sh -c 'dbus-send --session --print-reply --dest=org.freedesktop.DBus / \
 			org.freedesktop.DBus.NameHasOwner string:org.gnome.Mutter.DisplayConfig | grep -q true'
-	VNR_MUTTER_TEST_BUS=$bus run_test vnr-mutter mutter_headless
+	VNR_MUTTER_TEST_BUS=$bus VNR_MUTTER_TEST_CONFIG=$XDG_CONFIG_HOME \
+		run_test vnr-mutter mutter_headless
 	;;
 esac
 status=0

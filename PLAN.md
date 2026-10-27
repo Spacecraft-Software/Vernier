@@ -48,7 +48,7 @@ MVP: M0–M7 — Vernier v1.0
 
 - [x] P-023 `org.gnome.Mutter.DisplayConfig` `GetCurrentState` via `zbus`
 - [x] P-024 `ApplyMonitorsConfig`: verify (as `test`) and temporary; mirroring as shared logical monitors; physical and logical layout modes
-- [ ] P-043 Persistent GNOME changes without GNOME Shell's own confirm dialog doubling Vernier's (today: temporary only)
+- [ ] P-043 Persistent GNOME changes without GNOME Shell's own confirm dialog doubling Vernier's: implemented (`--save`, Save for GNOME; GNOME's dialog replaces Vernier's prompt; checked on headless Mutter), verify GNOME Shell's dialog with P-045
 - [x] P-044 Run the headless Mutter test (`crates/vnr-mutter/tests/mutter_headless.rs`) in CI
 - [ ] P-045 Verify on real GNOME hardware, including fractional scaling in logical layout mode
 

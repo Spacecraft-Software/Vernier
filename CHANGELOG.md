@@ -24,6 +24,12 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 
 ### Added
 
+- `--save` on `output set` and `profile apply`, and Save for GNOME in the
+  editor: GNOME saves the change for every login after its own Keep Changes
+  dialog, which replaces Vernier's prompt; a refusal exits 14, `REVERTED`.
+  `vnr backend get` reports `save_on_request`. A change on GNOME without
+  `--save` now warns that it lasts until logout.
+
 - CI (GitHub Actions): fmt, clippy and tests; a minimum-Rust (1.90) build;
   and each backend's end-to-end test against a real headless server (sway,
   the Xorg dummy driver, KWin, Mutter) via `scripts/test-servers.sh`.

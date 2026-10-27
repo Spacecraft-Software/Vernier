@@ -215,6 +215,12 @@ On wlroots compositors such as niri, a change lasts until the compositor
 restarts.  The @samp{Save for niri} button writes the applied layout to
 @file{~/.config/niri/vernier.kdl}; @pxref{Making Changes Permanent}.
 
+@cindex save for GNOME
+On GNOME, a change lasts until you log out.  The @samp{Save for GNOME}
+button asks GNOME to save the applied layout; GNOME shows its own
+@samp{Keep Changes} dialog, and saves only if you choose it within 20
+seconds.
+
 @node Editor Keys
 @section Default key bindings
 
@@ -397,6 +403,11 @@ Seconds to wait for confirmation before reverting; 15 by default.
 @item --persist @var{file}
 Once the change is kept, also write niri @code{output} blocks for the
 whole layout to @var{file} (@pxref{Making Changes Permanent}).
+@item --save
+On GNOME, have GNOME save the change for every login.  GNOME's own
+dialog replaces Vernier's prompt, so @option{--save} cannot be combined
+with @option{--yes}, @option{--timeout} or @option{--persist}
+(@pxref{Making Changes Permanent}).
 @end table
 @end table
 
@@ -416,7 +427,8 @@ Save the current layout as a profile (@pxref{Profiles}).
 @item vnr profile apply @var{file}
 @findex profile apply
 Apply a saved profile, then keep or revert it.  Accepts
-@option{--timeout} and @option{--persist} as @samp{output set} does.
+@option{--timeout}, @option{--persist} and @option{--save} as
+@samp{output set} does.
 
 @item vnr layout export --to @var{format}
 @findex layout export
@@ -511,6 +523,23 @@ include "vernier.kdl"
 @option{--persist} never writes @file{config.kdl} itself, never follows a
 symbolic link, and replaces a file only if Vernier generated it.  It
 checks the file before anything on screen changes.
+
+@cindex GNOME
+On GNOME, Vernier's changes last until you log out.  To keep one for
+every login, add @option{--save}:
+
+@example
+vnr output set eDP-1 --scale 1.5 --save
+@end example
+
+GNOME then asks on screen whether to keep the new layout, in place of
+Vernier's prompt.  Choose @samp{Keep Changes} within 20 seconds and
+GNOME saves it in @file{~/.config/monitors.xml}; otherwise GNOME
+restores the previous layout and @command{vnr} exits with status 14
+(@code{REVERTED}).  GNOME's dialog needs someone at the screen, so
+@option{--save} refuses @option{--yes}.  KDE Plasma saves every change
+by itself, so @option{--save} changes nothing there; other backends
+report it as unsupported.
 
 @cindex kanshi
 @cindex shikane
@@ -614,8 +643,9 @@ mirroring, fine scale and the Xwayland primary output
 @cindex capabilities
 @samp{vnr backend get} shows what the backend in use can do: mirroring,
 adaptive sync, a primary output, custom modes, fractional scale, testing
-before applying, and whether the display server keeps changes across a
-restart by itself.
+before applying, whether the display server keeps changes across a
+restart by itself, and whether it saves one on request
+(@option{--save}).
 
 @node Environment
 @chapter Environment

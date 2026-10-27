@@ -18,7 +18,7 @@ use iced::widget::{
 use iced::{Border, Element, Font, Length, Subscription, Task, Theme, time};
 use vnr_core::geometry::{normalize, resolve_overlap};
 use vnr_core::{
-    AdaptiveSync, BackendKind, Capabilities, Issue, Layout, Mode, Output, Position, Scale,
+    AdaptiveSync, BackendKind, Capabilities, Issue, Layout, Mode, Output, Position, Saved, Scale,
     Severity, Transform, export, validate,
 };
 
@@ -172,6 +172,11 @@ pub enum Message {
     SaveNiri,
     /// The niri include file was written, or why not.
     SavedNiri(Result<PathBuf, String>),
+    /// Ask the display server (GNOME) to save the applied layout; it shows
+    /// its own keep-or-revert dialog.
+    SaveServer,
+    /// The server's dialog was answered, or why saving failed.
+    SavedServer(Result<Saved, String>),
     /// Re-read the configuration from the display server.
     Reload,
     /// Discard edits.
@@ -271,6 +276,12 @@ fn save_niri(path: &Path, layout: &Layout) -> Result<(), String> {
     }
     fs::write(path, export::niri(layout))
         .map_err(|e| format!("cannot write {}: {e}", path.display()))
+}
+
+/// Has the server save `desired`; blocks until its own dialog is answered.
+fn save(backend: Option<BackendKind>, desired: &Layout) -> Result<Saved, String> {
+    let mut backend = vnr_backends::open(backend).map_err(|e| e.to_string())?;
+    backend.apply_and_save(desired).map_err(|e| e.to_string())
 }
 
 fn apply(backend: Option<BackendKind>, desired: &Layout) -> Result<(), String> {
@@ -452,6 +463,20 @@ impl App {
             && self.draft == self.applied
     }
 
+    /// Whether the server can save a layout on request (GNOME).
+    fn offers_server_save(&self) -> bool {
+        self.caps.save_on_request && !self.options.demo
+    }
+
+    /// Saving asks the server to keep what is on screen, so, as with
+    /// "Save for niri", only with no edits or confirmation waiting.
+    fn can_save_server(&self) -> bool {
+        self.offers_server_save()
+            && self.busy.is_none()
+            && self.pending.is_none()
+            && self.draft == self.applied
+    }
+
     fn can_apply(&self) -> bool {
         self.busy.is_none()
             && self.pending.is_none()
@@ -502,16 +527,7 @@ impl App {
             | Message::EditY(_)) => self.edit(edit),
             Message::Apply => return self.start_apply(),
             Message::Applied(result) => return self.finish_apply(result),
-            Message::Keep => {
-                if self.pending.take().is_some() {
-                    self.status = if self.caps.persistent || self.options.demo {
-                        "Kept.".to_owned()
-                    } else {
-                        "Kept until the compositor restarts. Save for niri to make it permanent."
-                            .to_owned()
-                    };
-                }
-            }
+            Message::Keep => self.keep(),
             Message::Revert => return self.start_revert(),
             Message::Reverted(result) => {
                 self.busy = None;
@@ -531,6 +547,8 @@ impl App {
             }
             Message::SaveNiri => return self.start_save_niri(),
             Message::SavedNiri(result) => self.finish_save_niri(result),
+            Message::SaveServer => return self.start_save_server(),
+            Message::SavedServer(result) => return self.finish_save_server(result),
             Message::Reload => {
                 if self.busy.is_none() && self.pending.is_none() {
                     self.busy = Some("Reading displays");
@@ -736,6 +754,44 @@ impl App {
             ),
             Err(error) => format!("Not saved: {error}"),
         };
+    }
+
+    /// Confirms the pending configuration and says how long it lasts.
+    fn keep(&mut self) {
+        if self.pending.take().is_some() {
+            self.status = if self.caps.persistent || self.options.demo {
+                "Kept.".to_owned()
+            } else if self.caps.save_on_request {
+                "Kept until you log out. Save for GNOME to keep it after that.".to_owned()
+            } else {
+                "Kept until the compositor restarts. Save for niri to make it permanent.".to_owned()
+            };
+        }
+    }
+
+    fn start_save_server(&mut self) -> Task<Message> {
+        if !self.can_save_server() {
+            return Task::none();
+        }
+        self.busy = Some("Waiting for GNOME");
+        "GNOME is asking whether to keep this layout: choose Keep Changes within 20 seconds to save it."
+            .clone_into(&mut self.status);
+        let layout = self.applied.clone();
+        let backend = self.options.backend;
+        Task::perform(
+            background(move || save(backend, &layout)),
+            Message::SavedServer,
+        )
+    }
+
+    fn finish_save_server(&mut self, result: Result<Saved, String>) -> Task<Message> {
+        self.busy = None;
+        self.status = match result {
+            Ok(Saved::Kept) => "Saved. GNOME restores this layout at every login.".to_owned(),
+            Ok(Saved::Restored) => "Not saved: GNOME restored the previous layout.".to_owned(),
+            Err(error) => format!("Not saved: {error}"),
+        };
+        self.reload_task()
     }
 
     fn start_revert(&mut self) -> Task<Message> {
@@ -1006,6 +1062,11 @@ impl App {
                         .style(button::secondary)
                         .on_press_maybe(self.can_save_niri().then_some(Message::SaveNiri))
                 }))
+                .push(self.offers_server_save().then(|| {
+                    button("Save for GNOME")
+                        .style(button::secondary)
+                        .on_press_maybe(self.can_save_server().then_some(Message::SaveServer))
+                }))
                 .spacing(12)
                 .align_y(iced::Alignment::Center),
         )
@@ -1120,6 +1181,7 @@ fn demo_capabilities() -> Capabilities {
         fractional_scale: true,
         test_only: true,
         persistent: false,
+        save_on_request: false,
     }
 }
 
@@ -1258,6 +1320,31 @@ mod tests {
             fs::read_to_string(&path).unwrap(),
             "output \"eDP-1\" { off; }\n"
         );
+    }
+
+    #[test]
+    fn server_save_is_offered_only_where_the_server_can_save() {
+        let mut app = demo_app();
+        app.caps.save_on_request = true;
+        assert!(!app.offers_server_save(), "never in demo mode");
+        app.options.demo = false;
+        assert!(app.can_save_server());
+        let _ = app.update(Message::Select(0));
+        let _ = app.update(Message::SetScale(Scale::ONE));
+        assert!(!app.can_save_server(), "unapplied edits are not saved");
+        app.caps.save_on_request = false;
+        assert!(!app.offers_server_save());
+    }
+
+    #[test]
+    fn a_server_answer_is_reported() {
+        let mut app = demo_app();
+        app.options.demo = false;
+        app.busy = Some("Waiting for GNOME");
+        let _ = app.update(Message::SavedServer(Ok(Saved::Restored)));
+        assert!(app.status.contains("restored"), "{}", app.status);
+        let _ = app.update(Message::SavedServer(Ok(Saved::Kept)));
+        assert!(app.status.starts_with("Saved."), "{}", app.status);
     }
 
     #[test]

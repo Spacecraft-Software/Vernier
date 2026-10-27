@@ -352,6 +352,7 @@ impl Backend for KdeBackend {
             fractional_scale: true,
             test_only: false,
             persistent: true,
+            save_on_request: false,
         }
     }
 

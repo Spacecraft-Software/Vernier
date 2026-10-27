@@ -12,18 +12,24 @@
 //!   [`Backend::test`] asks Mutter; with method *temporary* it applies.
 //! - Mirroring is several monitors in one logical monitor.
 //!
-//! Vernier applies *temporarily*: a *persistent* apply makes GNOME Shell
-//! show its own keep-or-revert dialog, which would double Vernier's prompt
-//! and revert `--yes` changes after 20 seconds. Changes therefore last until
-//! the session ends; GNOME Settings makes them permanent.
+//! [`Backend::apply`] applies *temporarily*, so Vernier's own
+//! keep-or-revert prompt guards it and the change lasts until the session
+//! ends. [`Backend::apply_and_save`] applies *persistently*: Mutter then
+//! restores the previous configuration after 20 seconds unless the shell
+//! confirms, and GNOME Shell asks the user with its own dialog. No D-Bus
+//! call confirms on the user's behalf, so a saved change always passes
+//! through that dialog, and Vernier does not prompt as well. Plain Mutter
+//! without a shell confirms at once.
 
 // Rust guideline compliant 2026-10-20
 
 mod state;
 
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::time::{Duration, Instant, SystemTime};
 
-use vnr_core::{Backend, BackendError, BackendKind, Capabilities, Layout};
+use vnr_core::{Backend, BackendError, BackendKind, Capabilities, Layout, Saved};
 use zbus::blocking::Connection;
 use zbus::zvariant::{OwnedValue, Value};
 
@@ -36,6 +42,14 @@ const INTERFACE: &str = "org.gnome.Mutter.DisplayConfig";
 /// `ApplyMonitorsConfig` methods.
 const METHOD_VERIFY: u32 = 0;
 const METHOD_TEMPORARY: u32 = 1;
+const METHOD_PERSISTENT: u32 = 2;
+
+/// How long Mutter waits for the shell to confirm a persistent change
+/// (`DEFAULT_DISPLAY_CONFIGURATION_TIMEOUT` in Mutter 50), plus a margin
+/// for the restore to land.
+const CONFIRM_WINDOW: Duration = Duration::from_secs(20 + 5);
+/// How often to look for the user's answer while the dialog is up.
+const POLL: Duration = Duration::from_millis(250);
 
 /// Mutter's `layout-mode` value for physical layout.
 const LAYOUT_PHYSICAL: u32 = 2;
@@ -141,6 +155,7 @@ impl Backend for MutterBackend {
             fractional_scale: !self.state.physical,
             test_only: true,
             persistent: false,
+            save_on_request: true,
         }
     }
 
@@ -156,6 +171,56 @@ impl Backend for MutterBackend {
     fn apply(&mut self, desired: &Layout) -> Result<(), BackendError> {
         self.send(desired, METHOD_TEMPORARY)
     }
+
+    /// Mutter does not say how the shell's dialog was answered, so this
+    /// watches for the two effects: keeping writes `monitors.xml`, and
+    /// restoring reconfigures the monitors, which changes the serial. With
+    /// neither once Mutter's timeout has passed, the change was kept (the
+    /// file may live elsewhere when `XDG_CONFIG_HOME` differs from Mutter's).
+    fn apply_and_save(&mut self, desired: &Layout) -> Result<Saved, BackendError> {
+        let file = monitors_file();
+        let saved_before = file.as_ref().and_then(|f| modified(f));
+        self.send(desired, METHOD_PERSISTENT)?;
+        let applied = self.state.serial;
+        let started = Instant::now();
+        loop {
+            std::thread::sleep(POLL);
+            let saved = file.as_ref().and_then(|f| modified(f)) != saved_before;
+            let current = read(&self.conn)?;
+            let reconfigured = current.serial != applied;
+            self.state = current;
+            if let Some(answer) = verdict(saved, reconfigured, started.elapsed() >= CONFIRM_WINDOW)
+            {
+                return Ok(answer);
+            }
+        }
+    }
+}
+
+/// The user's answer, from what has happened so far: a restore wins over a
+/// save (Mutter saves only on confirmation and restores only otherwise, so
+/// both at once means a later change elsewhere), and silence past the
+/// timeout means the shell confirmed.
+const fn verdict(saved: bool, reconfigured: bool, timed_out: bool) -> Option<Saved> {
+    match (saved, reconfigured, timed_out) {
+        (_, true, _) => Some(Saved::Restored),
+        (true, false, _) | (false, false, true) => Some(Saved::Kept),
+        (false, false, false) => None,
+    }
+}
+
+/// Where Mutter saves the configuration: `monitors.xml` in the user's
+/// configuration directory.
+fn monitors_file() -> Option<PathBuf> {
+    let config = std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
+    Some(config.join("monitors.xml"))
+}
+
+fn modified(path: &std::path::Path) -> Option<SystemTime> {
+    std::fs::metadata(path).and_then(|m| m.modified()).ok()
 }
 
 /// Calls `GetCurrentState` and converts the reply.
@@ -262,6 +327,15 @@ fn dbus_error(error: zbus::Error) -> BackendError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_answer_follows_what_mutter_did() {
+        assert_eq!(verdict(false, false, false), None, "still waiting");
+        assert_eq!(verdict(true, false, false), Some(Saved::Kept));
+        assert_eq!(verdict(false, true, false), Some(Saved::Restored));
+        assert_eq!(verdict(true, true, false), Some(Saved::Restored));
+        assert_eq!(verdict(false, false, true), Some(Saved::Kept));
+    }
 
     #[test]
     fn missing_bus_is_unavailable() {

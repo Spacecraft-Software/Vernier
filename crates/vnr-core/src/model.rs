@@ -685,9 +685,13 @@ pub struct Capabilities {
     pub fractional_scale: bool,
     /// Can test a configuration without applying it.
     pub test_only: bool,
-    /// Saves applied configurations itself (KDE, GNOME); otherwise Vernier
-    /// must write them to the compositor's config.
+    /// Saves every applied configuration itself (KDE); otherwise it lasts
+    /// until the session or compositor ends.
     pub persistent: bool,
+    /// Saves a configuration when asked, after asking the user to confirm
+    /// it itself (GNOME); see [`crate::Backend::apply_and_save`].
+    #[serde(default)]
+    pub save_on_request: bool,
 }
 
 #[cfg(test)]

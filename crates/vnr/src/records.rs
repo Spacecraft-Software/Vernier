@@ -208,7 +208,8 @@ impl From<&Issue> for IssueRecord {
 pub struct ApplyReport {
     /// The backend used.
     pub backend: String,
-    /// `planned` (dry run), `unchanged`, `applied` or `kept` (confirmed on a terminal).
+    /// `planned` (dry run), `unchanged`, `applied`, or `kept` (confirmed on a
+    /// terminal, or in the display server's own dialog with `--save`).
     pub outcome: String,
     /// Settings that change.
     pub changes: Vec<ChangeRecord>,
@@ -222,6 +223,10 @@ pub struct ApplyReport {
     /// The niri include file `--persist` wrote, or would write on a dry run.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub persisted: Option<WriteReport>,
+    /// With `--save`: whether the display server saved the change after its
+    /// own keep-or-revert dialog (only `true` appears; a refusal is `REVERTED`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub saved_by_server: Option<bool>,
 }
 
 /// What `backend get` prints.
@@ -249,6 +254,8 @@ pub struct BackendRecord {
     pub test_only: bool,
     /// Saves applied configurations by itself.
     pub persistent: bool,
+    /// Saves a configuration on request (`--save`), after its own confirmation.
+    pub save_on_request: bool,
 }
 
 impl BackendRecord {
@@ -265,6 +272,7 @@ impl BackendRecord {
             fractional_scale: caps.fractional_scale,
             test_only: caps.test_only,
             persistent: caps.persistent,
+            save_on_request: caps.save_on_request,
         }
     }
 }
