@@ -16,7 +16,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
-use vnr_core::geometry::{normalize, resolve_overlap};
+use vnr_core::geometry::{normalize, reflow, resolve_overlap};
 use vnr_core::{
     Backend, BackendKind, Capabilities, Layout, Output, Position, Profile, Saved,
     Severity as IssueSeverity, export, validate,
@@ -523,10 +523,14 @@ fn change(
         )
         .with("issues", &report.issues));
     }
+    let mut rejection: Option<String> = None;
     if caps.test_only && !has_errors {
         match backend.test(&desired) {
             Ok(()) => report.accepted_by_backend = Some(true),
-            Err(e) if e.is_rejected() => report.accepted_by_backend = Some(false),
+            Err(e) if e.is_rejected() => {
+                report.accepted_by_backend = Some(false);
+                rejection = Some(e.to_string());
+            }
             Err(e) => return Err(AppError::backend(&e)),
         }
     }
@@ -538,11 +542,7 @@ fn change(
         return emit_report(out, &report);
     }
     if report.accepted_by_backend == Some(false) {
-        return Err(AppError::new(
-            ErrorCode::Rejected,
-            "the display server rejected the configuration in a test; nothing was changed",
-            "vnr output list --json",
-        ));
+        return Err(rejected_in_test(rejection.as_deref()));
     }
 
     if save {
@@ -1086,6 +1086,19 @@ fn print_document(out: &Out, document: &Value) -> Result<(), AppError> {
     Ok(())
 }
 
+/// The error for a configuration the server refused in a test, with the
+/// server's own reason when it gave one.
+fn rejected_in_test(reason: Option<&str>) -> AppError {
+    let message = match reason {
+        Some(reason) => format!(
+            "the display server rejected the configuration in a test: {reason}; nothing was changed"
+        ),
+        None => "the display server rejected the configuration in a test; nothing was changed"
+            .to_owned(),
+    };
+    AppError::new(ErrorCode::Rejected, message, "vnr output list --json")
+}
+
 /// Applies `output set` arguments to `current`.
 fn set(current: &Layout, args: &SetArgs) -> Result<Layout, AppError> {
     let mut layout = current.clone();
@@ -1120,6 +1133,7 @@ fn set(current: &Layout, args: &SetArgs) -> Result<Layout, AppError> {
         layout.outputs[index].enabled = false;
     }
 
+    let old_rect = layout.outputs[index].logical_rect();
     let output = &mut layout.outputs[index];
     let mut geometry_changed = false;
     if let Some(mode) = args.mode {
@@ -1167,6 +1181,9 @@ fn set(current: &Layout, args: &SetArgs) -> Result<Layout, AppError> {
     } else if let Some((target, side)) = relative {
         layout.outputs[index].position = place(&layout, index, target, side)?;
     } else if geometry_changed {
+        if let Some(old) = old_rect {
+            reflow(&mut layout, index, old);
+        }
         resolve_overlap(&mut layout, index);
     }
     normalize(&mut layout);
@@ -1246,6 +1263,16 @@ mod tests {
         assert_eq!(whole_seconds(Duration::from_millis(13_600)), 14);
         assert_eq!(whole_seconds(Duration::from_millis(13_400)), 13);
         assert_eq!(whole_seconds(Duration::ZERO), 0);
+    }
+
+    #[test]
+    fn scale_change_keeps_the_neighbour_touching() {
+        let result = set(&layout(), &set_args(&["eDP-1", "--scale", "1.25"])).unwrap();
+        assert_eq!(
+            result.get("eDP-1").unwrap().logical_size(),
+            Some((1536, 864))
+        );
+        assert_eq!(result.get("DP-1").unwrap().position, Position::new(1536, 0));
     }
 
     #[test]

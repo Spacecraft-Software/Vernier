@@ -149,6 +149,71 @@ pub fn normalize(layout: &mut Layout) {
     }
 }
 
+/// Keeps neighbours attached after `layout.outputs[index]` changed size.
+///
+/// `old` is the output's rectangle before the change. Outputs whose left
+/// edge touched its right edge (sharing rows) move by the change in width,
+/// and so does every output chained to them the same way; the same holds
+/// below it for the change in height. Edges that touched still touch, and
+/// outputs that never touched it stay where they are. If moving two
+/// neighbours makes them collide, the later one is pushed clear. Mutter, for
+/// one, rejects a layout with a gap.
+pub fn reflow(layout: &mut Layout, index: usize, old: Rect) {
+    let Some(new) = layout.outputs.get(index).and_then(Output::logical_rect) else {
+        return;
+    };
+    let dx = to_i32(new.width).saturating_sub(to_i32(old.width));
+    let dy = to_i32(new.height).saturating_sub(to_i32(old.height));
+    let rects: Vec<Option<Rect>> = layout
+        .outputs
+        .iter()
+        .enumerate()
+        .map(|(i, o)| {
+            (i != index && o.enabled && o.mirror_of.is_none())
+                .then(|| o.logical_rect())
+                .flatten()
+        })
+        .collect();
+    let shares = |lo: i32, hi: i32, olo: i32, ohi: i32| lo < ohi && olo < hi;
+    let right_of = |from: Rect, to: Rect| {
+        to.x == from.right() && shares(to.y, to.bottom(), from.y, from.bottom())
+    };
+    let below = |from: Rect, to: Rect| {
+        to.y == from.bottom() && shares(to.x, to.right(), from.x, from.right())
+    };
+    let chain = |touches: &dyn Fn(Rect, Rect) -> bool| {
+        let mut moved = vec![false; rects.len()];
+        let mut frontier = vec![old];
+        while let Some(from) = frontier.pop() {
+            for (i, rect) in rects.iter().enumerate() {
+                let Some(rect) = rect else { continue };
+                if !moved[i] && touches(from, *rect) {
+                    moved[i] = true;
+                    frontier.push(*rect);
+                }
+            }
+        }
+        moved
+    };
+    let sideways = chain(&right_of);
+    let down = chain(&below);
+    let mut touched = Vec::new();
+    for (i, other) in layout.outputs.iter_mut().enumerate() {
+        if sideways[i] {
+            other.position.x = other.position.x.saturating_add(dx);
+        }
+        if down[i] {
+            other.position.y = other.position.y.saturating_add(dy);
+        }
+        if sideways[i] || down[i] {
+            touched.push(i);
+        }
+    }
+    for i in touched {
+        resolve_overlap(layout, i);
+    }
+}
+
 /// Pushes a placed output out of any overlap by moving it right of the
 /// rectangle it overlaps, repeating until it is clear.
 ///
@@ -176,7 +241,7 @@ pub fn resolve_overlap(layout: &mut Layout, index: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::Mode;
+    use crate::model::{Mode, Scale};
 
     fn output(name: &str, x: i32, y: i32, width: u32, height: u32) -> Output {
         let mut output = Output::new(name);
@@ -222,6 +287,78 @@ mod tests {
         normalize(&mut layout);
         assert_eq!(layout.outputs[0].position, Position::new(0, 0));
         assert_eq!(layout.outputs[1].position, Position::new(1920, 0));
+    }
+
+    #[test]
+    fn reflow_keeps_the_right_neighbour_touching() {
+        let mut layout = Layout::new(vec![
+            output("A", 0, 0, 1920, 1080),
+            output("B", 1920, 0, 1920, 1080),
+        ]);
+        let old = layout.outputs[0].logical_rect().unwrap();
+        layout.outputs[0].scale = Scale::from_f64(1.25).unwrap();
+        reflow(&mut layout, 0, old);
+        assert_eq!(layout.outputs[1].position, Position::new(1536, 0));
+    }
+
+    #[test]
+    fn reflow_does_not_overlap_a_corner_neighbour() {
+        let mut layout = Layout::new(vec![
+            output("A", 0, 0, 1920, 1080),
+            output("B", 1920, 0, 1920, 1080),
+            output("C", 1920, 1080, 1920, 1080),
+        ]);
+        let old = layout.outputs[0].logical_rect().unwrap();
+        layout.outputs[0].scale = Scale::from_f64(1.25).unwrap();
+        reflow(&mut layout, 0, old);
+        assert_eq!(layout.outputs[1].position, Position::new(1536, 0));
+        assert_eq!(layout.outputs[2].position, Position::new(1920, 1080));
+    }
+
+    #[test]
+    fn reflow_leaves_outputs_that_never_touched_it() {
+        let mut layout = Layout::new(vec![
+            output("A", 0, 0, 100, 100),
+            output("D", 0, 100, 300, 100),
+            output("C", 200, 0, 100, 100),
+        ]);
+        let old = layout.outputs[0].logical_rect().unwrap();
+        layout.outputs[0].mode = Some(Mode::new(50, 100, 60_000));
+        reflow(&mut layout, 0, old);
+        assert_eq!(layout.outputs[1].position, Position::new(0, 100));
+        assert_eq!(layout.outputs[2].position, Position::new(200, 0));
+    }
+
+    #[test]
+    fn reflow_follows_a_chain_of_touching_outputs() {
+        let mut layout = Layout::new(vec![
+            output("A", 0, 0, 1920, 1080),
+            output("B", 1920, 0, 1920, 1080),
+            output("C", 3840, 0, 1920, 1080),
+        ]);
+        let old = layout.outputs[0].logical_rect().unwrap();
+        layout.outputs[0].scale = Scale::from_f64(1.25).unwrap();
+        reflow(&mut layout, 0, old);
+        assert_eq!(layout.outputs[1].position.x, 1536);
+        assert_eq!(layout.outputs[2].position.x, 3456);
+    }
+
+    #[test]
+    fn reflow_clears_collisions_between_moved_neighbours() {
+        let mut layout = Layout::new(vec![
+            output("A", 0, 0, 100, 100),
+            output("B", 100, 0, 100, 100),
+            output("C", 0, 100, 100, 100),
+        ]);
+        let old = layout.outputs[0].logical_rect().unwrap();
+        layout.outputs[0].scale = Scale::from_f64(2.0).unwrap();
+        reflow(&mut layout, 0, old);
+        let rects: Vec<_> = layout.placed_rects().map(|(_, r)| r).collect();
+        for (i, a) in rects.iter().enumerate() {
+            for b in &rects[i + 1..] {
+                assert!(!a.intersects(b), "{a:?} overlaps {b:?}");
+            }
+        }
     }
 
     #[test]

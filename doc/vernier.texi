@@ -368,7 +368,13 @@ Show one output, including every mode it supports.
 
 @item vnr output set @var{output} @var{settings}@dots{}
 @findex output set
-Change one output.  The settings are:
+Change one output.  A new mode, scale or transform changes the output's
+size on the desktop, so Vernier moves the outputs beside it to keep their
+edges touching: an output whose edge touched its right edge moves
+sideways, as does anything lined up beside that one, and likewise below.
+Outputs that did not touch it stay put; if two moved outputs would collide,
+one is pushed clear.  @option{--pos} and the @option{--left-of}
+family place the output explicitly and skip this.  The settings are:
 
 @table @option
 @item --on
