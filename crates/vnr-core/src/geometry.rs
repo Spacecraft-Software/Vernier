@@ -149,6 +149,31 @@ pub fn normalize(layout: &mut Layout) {
     }
 }
 
+/// Keeps neighbours attached after `layout.outputs[index]` changed size.
+///
+/// `old` is the output's rectangle before the change. Outputs that started at
+/// or beyond its right edge move by the change in width, and those at or
+/// below its bottom edge by the change in height, so edges that touched still
+/// touch. Mutter, for one, rejects a layout with a gap.
+pub fn reflow(layout: &mut Layout, index: usize, old: Rect) {
+    let Some(new) = layout.outputs.get(index).and_then(Output::logical_rect) else {
+        return;
+    };
+    let dx = to_i32(new.width).saturating_sub(to_i32(old.width));
+    let dy = to_i32(new.height).saturating_sub(to_i32(old.height));
+    for (i, other) in layout.outputs.iter_mut().enumerate() {
+        if i == index || !other.enabled || other.mirror_of.is_some() {
+            continue;
+        }
+        if other.position.x >= old.right() {
+            other.position.x = other.position.x.saturating_add(dx);
+        }
+        if other.position.y >= old.bottom() {
+            other.position.y = other.position.y.saturating_add(dy);
+        }
+    }
+}
+
 /// Pushes a placed output out of any overlap by moving it right of the
 /// rectangle it overlaps, repeating until it is clear.
 ///
@@ -176,7 +201,7 @@ pub fn resolve_overlap(layout: &mut Layout, index: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::Mode;
+    use crate::model::{Mode, Scale};
 
     fn output(name: &str, x: i32, y: i32, width: u32, height: u32) -> Output {
         let mut output = Output::new(name);
@@ -222,6 +247,18 @@ mod tests {
         normalize(&mut layout);
         assert_eq!(layout.outputs[0].position, Position::new(0, 0));
         assert_eq!(layout.outputs[1].position, Position::new(1920, 0));
+    }
+
+    #[test]
+    fn reflow_keeps_the_right_neighbour_touching() {
+        let mut layout = Layout::new(vec![
+            output("A", 0, 0, 1920, 1080),
+            output("B", 1920, 0, 1920, 1080),
+        ]);
+        let old = layout.outputs[0].logical_rect().unwrap();
+        layout.outputs[0].scale = Scale::from_f64(1.25).unwrap();
+        reflow(&mut layout, 0, old);
+        assert_eq!(layout.outputs[1].position, Position::new(1536, 0));
     }
 
     #[test]

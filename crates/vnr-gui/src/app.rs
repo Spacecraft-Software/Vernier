@@ -16,7 +16,7 @@ use iced::widget::{
     text_input, toggler,
 };
 use iced::{Border, Element, Font, Length, Subscription, Task, Theme, time};
-use vnr_core::geometry::{normalize, resolve_overlap};
+use vnr_core::geometry::{normalize, reflow, resolve_overlap};
 use vnr_core::{
     AdaptiveSync, BackendKind, Capabilities, Issue, Layout, Mode, Output, Position, Saved, Scale,
     Severity, Transform, export, validate,
@@ -437,8 +437,16 @@ impl App {
         }
     }
 
-    fn geometry_changed(&mut self) {
+    fn selected_rect(&self) -> Option<vnr_core::geometry::Rect> {
+        self.selected_output()
+            .and_then(vnr_core::Output::logical_rect)
+    }
+
+    fn geometry_changed(&mut self, old: Option<vnr_core::geometry::Rect>) {
         if let Some(index) = self.selected {
+            if let Some(old) = old {
+                reflow(&mut self.draft, index, old);
+            }
             resolve_overlap(&mut self.draft, index);
             normalize(&mut self.draft);
         }
@@ -606,22 +614,25 @@ impl App {
                 }
             }
             Message::SetMode(mode) => {
+                let old = self.selected_rect();
                 if let Some(output) = self.selected_output_mut() {
                     output.mode = Some(mode);
                 }
-                self.geometry_changed();
+                self.geometry_changed(old);
             }
             Message::SetScale(scale) => {
+                let old = self.selected_rect();
                 if let Some(output) = self.selected_output_mut() {
                     output.scale = scale;
                 }
-                self.geometry_changed();
+                self.geometry_changed(old);
             }
             Message::SetTransform(transform) => {
+                let old = self.selected_rect();
                 if let Some(output) = self.selected_output_mut() {
                     output.transform = transform;
                 }
-                self.geometry_changed();
+                self.geometry_changed(old);
             }
             Message::SetAdaptiveSync(sync) => {
                 if let Some(output) = self.selected_output_mut() {
@@ -630,13 +641,14 @@ impl App {
                 self.edited();
             }
             Message::SetMirror(choice) => {
+                let old = self.selected_rect();
                 if let Some(output) = self.selected_output_mut() {
                     output.mirror_of = match choice {
                         MirrorChoice::Off => None,
                         MirrorChoice::Of(name) => Some(name),
                     };
                 }
-                self.geometry_changed();
+                self.geometry_changed(old);
             }
             Message::SetPrimary(on) => {
                 let selected = self.selected;
