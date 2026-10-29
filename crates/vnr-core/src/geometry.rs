@@ -151,24 +151,30 @@ pub fn normalize(layout: &mut Layout) {
 
 /// Keeps neighbours attached after `layout.outputs[index]` changed size.
 ///
-/// `old` is the output's rectangle before the change. Outputs that started at
-/// or beyond its right edge move by the change in width, and those at or
-/// below its bottom edge by the change in height, so edges that touched still
-/// touch. Mutter, for one, rejects a layout with a gap.
+/// `old` is the output's rectangle before the change. An output that sat to
+/// the right of it and shared rows with it moves by the change in width; one
+/// that sat below it and shared columns with it moves by the change in
+/// height. Edges that touched still touch, and outputs that never touched it
+/// stay where they are, so a valid arrangement cannot gain an overlap.
+/// Mutter, for one, rejects a layout with a gap.
 pub fn reflow(layout: &mut Layout, index: usize, old: Rect) {
     let Some(new) = layout.outputs.get(index).and_then(Output::logical_rect) else {
         return;
     };
     let dx = to_i32(new.width).saturating_sub(to_i32(old.width));
     let dy = to_i32(new.height).saturating_sub(to_i32(old.height));
+    let shares = |lo: i32, hi: i32, olo: i32, ohi: i32| lo < ohi && olo < hi;
     for (i, other) in layout.outputs.iter_mut().enumerate() {
         if i == index || !other.enabled || other.mirror_of.is_some() {
             continue;
         }
-        if other.position.x >= old.right() {
+        let Some(rect) = other.logical_rect() else {
+            continue;
+        };
+        if rect.x >= old.right() && shares(rect.y, rect.bottom(), old.y, old.bottom()) {
             other.position.x = other.position.x.saturating_add(dx);
         }
-        if other.position.y >= old.bottom() {
+        if rect.y >= old.bottom() && shares(rect.x, rect.right(), old.x, old.right()) {
             other.position.y = other.position.y.saturating_add(dy);
         }
     }
@@ -259,6 +265,20 @@ mod tests {
         layout.outputs[0].scale = Scale::from_f64(1.25).unwrap();
         reflow(&mut layout, 0, old);
         assert_eq!(layout.outputs[1].position, Position::new(1536, 0));
+    }
+
+    #[test]
+    fn reflow_does_not_overlap_a_corner_neighbour() {
+        let mut layout = Layout::new(vec![
+            output("A", 0, 0, 1920, 1080),
+            output("B", 1920, 0, 1920, 1080),
+            output("C", 1920, 1080, 1920, 1080),
+        ]);
+        let old = layout.outputs[0].logical_rect().unwrap();
+        layout.outputs[0].scale = Scale::from_f64(1.25).unwrap();
+        reflow(&mut layout, 0, old);
+        assert_eq!(layout.outputs[1].position, Position::new(1536, 0));
+        assert_eq!(layout.outputs[2].position, Position::new(1920, 1080));
     }
 
     #[test]

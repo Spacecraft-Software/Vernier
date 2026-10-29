@@ -15,8 +15,8 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 ### Fixed
 
 - Changing an output's scale, mode or rotation (`output set`, and the
-  editor) now moves the screens beside it by the change in size, so edges
-  that touched still touch. Before, a scale of 1.25 on GNOME left a gap that
+  editor) now moves the screens beside it (those sharing rows or columns with it)
+  by the change in size, so edges that touched still touch. Before, a scale of 1.25 on GNOME left a gap that
   Mutter refused. A test rejection now carries the server's own reason.
 - `vnr gui` names any run-time library it cannot load (`libwayland-client`;
   `libX11`, `libX11-xcb`, `libXcursor`, `libXi`; `libxkbcommon`) and exits
