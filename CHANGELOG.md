@@ -14,6 +14,8 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 
 ### Fixed
 
+- `output set --no-mirror` places the output beside the screen it mirrored.
+  It used to stay on top of it, and Mutter refused the overlap.
 - Changing an output's scale, mode or rotation (`output set`, and the
   editor) now moves the screens that touched it (and any chained to them)
   by the change in size, so edges that touched still touch. Before, a scale of 1.25 on GNOME left a gap that

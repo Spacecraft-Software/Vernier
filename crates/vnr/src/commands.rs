@@ -1159,7 +1159,9 @@ fn set(current: &Layout, args: &SetArgs) -> Result<Layout, AppError> {
         output.mirror_of = Some(source.clone());
     }
     if args.no_mirror {
-        output.mirror_of = None;
+        // A mirror shares its source's position, so leaving it puts the
+        // output on top of the source; the placement below moves it clear.
+        geometry_changed |= output.mirror_of.take().is_some();
     }
     if args.primary {
         for (i, other) in layout.outputs.iter_mut().enumerate() {
@@ -1273,6 +1275,23 @@ mod tests {
             Some((1536, 864))
         );
         assert_eq!(result.get("DP-1").unwrap().position, Position::new(1536, 0));
+    }
+
+    #[test]
+    fn leaving_a_mirror_puts_the_output_beside_its_source() {
+        let mut mirrored = layout();
+        let monitor = mirrored
+            .outputs
+            .iter_mut()
+            .find(|o| o.name == "DP-1")
+            .unwrap();
+        monitor.mirror_of = Some("eDP-1".into());
+        monitor.position = Position::new(0, 0);
+        let result = set(&mirrored, &set_args(&["DP-1", "--no-mirror"])).unwrap();
+        let rects: Vec<_> = result.placed_rects().map(|(_, r)| r).collect();
+        assert!(!rects[0].intersects(&rects[1]), "{rects:?}");
+        assert!(rects[0].touches(&rects[1]), "{rects:?}");
+        assert!(result.get("DP-1").unwrap().mirror_of.is_none());
     }
 
     #[test]
