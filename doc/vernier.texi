@@ -401,7 +401,10 @@ One of @code{normal}, @code{90}, @code{180}, @code{270}, @code{flipped},
 @code{disabled}, @code{automatic} or @code{always}.
 @item --mirror @var{output}
 @itemx --no-mirror
-Mirror another output, or stop mirroring.
+Mirror another output, or stop mirroring.  A mirror shares its source's
+position, so an output that stops mirroring is moved clear of it, beside
+the source; give @option{--pos} or one of the @option{--left-of} family
+to put it somewhere else.
 @item --primary
 Make this the primary output.
 @item --timeout @var{seconds}
