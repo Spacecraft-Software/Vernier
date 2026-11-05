@@ -104,9 +104,9 @@
 (define rust-async-channel-2.5.0
   (crate-source "async-channel" "2.5.0"
                 "1ljq24ig8lgs2555myrrjighycpx2mbjgrm3q7lpa6rdsmnxjklj"))
-(define rust-async-executor-1.14.0
-  (crate-source "async-executor" "1.14.0"
-                "0al1rmxjy7p7r6h50z698q5lwssqs5a2vzmqbazm1z2sv1rgjsy9"))
+(define rust-async-executor-1.14.1
+  (crate-source "async-executor" "1.14.1"
+                "0dsg3ijjbrky4qas8g7nyjpryg1646jsfpmwjxi14df74q8s69pl"))
 (define rust-async-io-2.6.0
   (crate-source "async-io" "2.6.0"
                 "1z16s18bm4jxlmp6rif38mvn55442yd3wjvdfhvx4hkgxf7qlss5"))
@@ -1690,7 +1690,7 @@
    rust-assert-cmd-2.2.2
    rust-async-broadcast-0.7.2
    rust-async-channel-2.5.0
-   rust-async-executor-1.14.0
+   rust-async-executor-1.14.1
    rust-async-io-2.6.0
    rust-async-lock-3.4.2
    rust-async-process-2.5.0
