@@ -4,6 +4,17 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 
 ## Unreleased
 
+## 0.1.0 - 2026-11-05
+
+First release. Vernier configures displays on wlroots compositors (niri,
+sway), KDE Plasma, GNOME and X11, from the command line and an iced editor.
+Verified on headless servers (sway, KWin, Mutter, Xorg) and on real
+GNOME 50. Known gaps, all listed in `release/known-gaps.txt`: COSMIC
+(VNR-SRS-011) is untested on hardware, screen-reader names wait on upstream
+iced (VNR-SRS-134), fuzzing is incomplete (VNR-SRS-101), and the speed and
+idle-CPU budgets (VNR-SRS-110, 111, 113) are not yet measured on the
+reference machine.
+
 ### Changed
 
 - Release builds optimize for size (`opt-level = "s"`), keeping level 3 for
