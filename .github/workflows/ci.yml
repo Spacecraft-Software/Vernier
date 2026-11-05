@@ -104,6 +104,8 @@ jobs:
           ! grep -E '^doc/[^ ]+\.texi:[0-9]+:' doc-build.log
       - name: Guix crate list matches Cargo.lock
         run: python3 scripts/guix-crates.py --check
+      - name: Requirements traceability
+        run: python3 scripts/traceability.py --release --accept release/known-gaps.txt > /dev/null
       - name: Shell scripts in packaging pass shellcheck
         run: |
           shellcheck -s bash -e SC2034,SC2154,SC2164 packaging/PKGBUILD

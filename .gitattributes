@@ -1,2 +1,7 @@
 * text=auto eol=lf
 *.png binary
+
+# Packaging definitions that embed the release tarball hash are not part of it.
+packaging/PKGBUILD export-ignore
+packaging/default.nix export-ignore
+packaging/guix.scm export-ignore

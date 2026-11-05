@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Mandatory requirements accepted as unverified in the current release
+# (scripts/traceability.py --release --accept release/known-gaps.txt).
+# Remove a line when its requirement is verified.
+VNR-SRS-011  # COSMIC extension: no COSMIC hardware to demonstrate on (PLAN P-015)
+VNR-SRS-101  # fuzzing not yet run against every parser
+VNR-SRS-134  # screen-reader names wait on AccessKit in upstream iced (PLAN P-029)
