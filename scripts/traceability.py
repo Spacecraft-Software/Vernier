@@ -37,9 +37,19 @@ def needs():
 
 def requirements(errors):
     rows, seen = [], {}
+    in_section = False
     for lineno, line in enumerate((ROOT / "AGENTS.md").read_text().splitlines(), 1):
+        if line.startswith("## "):
+            in_section = line.startswith("## Requirements")
+            continue
+        if not in_section or not line.startswith("|"):
+            continue
+        first = line.strip().strip("|").split("|")[0].strip()
+        if first == "ID" or set(first) <= set("-: "):
+            continue  # table header or separator
         m = ROW.match(line)
         if not m:
+            errors.append(f"AGENTS.md:{lineno}: malformed requirement identifier {first!r} (expected VNR-SRS-NNN)")
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         ident = m.group(2)
