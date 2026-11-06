@@ -5,13 +5,14 @@
 
 Every crate in the lock file becomes a component with its version, package
 URL and, for registry crates, the SHA-256 recorded in the lock. The output
-depends only on Cargo.lock and the timestamp given by --timestamp (ISO 8601
-UTC), so the same inputs give the same bytes.
+depends only on Cargo.lock, the workspace Cargo.toml files and the timestamp
+given by --timestamp (ISO 8601 UTC), so the same inputs give the same bytes.
 
 Usage: scripts/sbom.py --timestamp 2026-11-05T00:00:00Z > vernier-0.1.0.cdx.json
 """
 
 import argparse
+import datetime
 import json
 import sys
 import tomllib
@@ -20,18 +21,38 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def workspace_licenses():
+    """Map each workspace crate's name to its declared SPDX license."""
+    root = tomllib.loads((ROOT / "Cargo.toml").read_text())
+    inherited = root.get("workspace", {}).get("package", {}).get("license")
+    found = {}
+    for manifest in sorted((ROOT / "crates").glob("*/Cargo.toml")):
+        pkg = tomllib.loads(manifest.read_text()).get("package", {})
+        lic = pkg.get("license")
+        if isinstance(lic, dict) and lic.get("workspace"):
+            lic = inherited
+        if pkg.get("name") and isinstance(lic, str):
+            found[pkg["name"]] = lic
+    return found
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--timestamp", required=True, help="ISO 8601 UTC, e.g. 2026-11-05T00:00:00Z")
     args = ap.parse_args()
-    if not args.timestamp.endswith("Z"):
-        print("[ERROR] --timestamp must be UTC with a Z suffix", file=sys.stderr)
+    try:
+        datetime.datetime.strptime(args.timestamp, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        print("[ERROR] --timestamp must be YYYY-MM-DDTHH:MM:SSZ (UTC)", file=sys.stderr)
         return 2
     lock = tomllib.loads((ROOT / "Cargo.lock").read_text())
-    workspace = (ROOT / "Cargo.toml").read_text()
-    version = next(
-        line.split('"')[1] for line in workspace.splitlines() if line.startswith("version") and '"' in line
-    )
+    root = tomllib.loads((ROOT / "Cargo.toml").read_text())
+    version = root["workspace"]["package"]["version"]
+    licenses = workspace_licenses()
+    names = [(p["name"], p["version"]) for p in lock["package"]]
+    if len(names) != len(set(names)):
+        print("[ERROR] Cargo.lock lists the same crate name and version twice", file=sys.stderr)
+        return 1
     components = []
     for pkg in sorted(lock["package"], key=lambda p: (p["name"], p["version"])):
         comp = {
@@ -43,8 +64,8 @@ def main():
         }
         if "checksum" in pkg:
             comp["hashes"] = [{"alg": "SHA-256", "content": pkg["checksum"]}]
-        if "source" not in pkg:
-            comp["licenses"] = [{"license": {"id": "GPL-3.0-or-later"}}]
+        if "source" not in pkg and pkg["name"] in licenses:
+            comp["licenses"] = [{"license": {"id": licenses[pkg["name"]]}}]
         components.append(comp)
     bom = {
         "bomFormat": "CycloneDX",
