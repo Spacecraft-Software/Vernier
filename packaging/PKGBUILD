@@ -3,9 +3,7 @@
 #
 # Arch Linux package for Vernier. From this directory:
 #   makepkg -si
-# Until the first release is tagged this builds the git checkout it sits
-# in; the release switches source=() to the tag's tarball and fills in
-# sha256sums=().
+# Builds the v0.1.0 release tarball, checked against sha256sums.
 # Maintainer: Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>
 
 pkgname=vernier
@@ -24,22 +22,17 @@ optdepends=(
 )
 makedepends=('cargo' 'texinfo')
 install=vernier.install
-source=()
-sha256sums=()
-
-_root() {
-  # The repository root, one level above this PKGBUILD.
-  printf '%s\n' "$(cd "$startdir/.." && pwd)"
-}
+source=("$pkgname-$pkgver.tar.gz::https://github.com/Spacecraft-Software/Vernier/releases/download/v$pkgver/$pkgname-$pkgver.tar.gz")
+sha256sums=('d3713e070b057f8da1347b894756ce24fb76a11c135d81746496646f6fe78892')
 
 prepare() {
-  cd "$(_root)"
+  cd "$srcdir/$pkgname-$pkgver"
   export RUSTUP_TOOLCHAIN=stable
   cargo fetch --locked --target "$(rustc -vV | sed -n 's/^host: //p')"
 }
 
 build() {
-  cd "$(_root)"
+  cd "$srcdir/$pkgname-$pkgver"
   export RUSTUP_TOOLCHAIN=stable
   export CARGO_TARGET_DIR="$srcdir/target"
   cargo build --frozen --release -p vnr
@@ -47,14 +40,14 @@ build() {
 }
 
 check() {
-  cd "$(_root)"
+  cd "$srcdir/$pkgname-$pkgver"
   export RUSTUP_TOOLCHAIN=stable
   export CARGO_TARGET_DIR="$srcdir/target"
   cargo test --frozen --workspace
 }
 
 package() {
-  cd "$(_root)"
+  cd "$srcdir/$pkgname-$pkgver"
   install -Dm755 "$srcdir/target/release/vnr" "$pkgdir/usr/bin/vnr"
   install -Dm644 "$srcdir/vernier.info" "$pkgdir/usr/share/info/vernier.info"
   install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
