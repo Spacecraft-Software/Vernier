@@ -36,6 +36,12 @@ use crate::theme::{self, Resolution, Steelbore};
 /// screen recovers without intervention. Matches GNOME and KDE.
 const REVERT_SECONDS: u32 = 15;
 
+/// What the footer says while a change is being applied.
+const APPLYING: &str = "Applying";
+
+/// What the footer says while the previous configuration is restored.
+const REVERTING: &str = "Reverting";
+
 /// Width of the properties panel in logical pixels.
 const PANEL_WIDTH: f32 = 340.0;
 
@@ -187,6 +193,10 @@ pub enum Message {
     SetPreviews(bool),
     /// The capture thread sent a picture, or gave up.
     Preview(preview::Event),
+    /// The window manager asked to close the window.
+    CloseRequested,
+    /// SIGINT, SIGTERM or SIGHUP arrived.
+    Signal,
 }
 
 /// The editor.
@@ -211,6 +221,8 @@ pub struct App {
     y_text: String,
     pending: Option<Pending>,
     busy: Option<&'static str>,
+    /// The editor is closing once nothing unconfirmed is left on screen.
+    closing: bool,
     status: String,
     issues: Vec<Issue>,
     overlapping: Vec<String>,
@@ -337,6 +349,7 @@ impl App {
             y_text: String::new(),
             pending: None,
             busy: Some("Reading displays"),
+            closing: false,
             status: options
                 .config_problem
                 .as_ref()
@@ -380,12 +393,16 @@ impl App {
         self.theme.clone()
     }
 
-    /// Listens to the keyboard always, ticks once a second while a
-    /// confirmation is pending, and receives screen contents while they
-    /// are shown. Turning previews off drops the capture subscription,
-    /// which stops its thread.
+    /// Listens to the keyboard, close requests and signals always, ticks
+    /// once a second while a confirmation is pending, and receives screen
+    /// contents while they are shown. Turning previews off drops the
+    /// capture subscription, which stops its thread.
     pub fn subscription(&self) -> Subscription<Message> {
-        let mut subscriptions = vec![iced::event::listen_with(key_command)];
+        let mut subscriptions = vec![
+            iced::event::listen_with(key_command),
+            iced::window::close_requests().map(|_| Message::CloseRequested),
+            Subscription::run(crate::signals::start).map(|()| Message::Signal),
+        ];
         if self.pending.is_some() {
             subscriptions.push(time::every(Duration::from_secs(1)).map(|_| Message::Tick));
         }
@@ -546,14 +563,8 @@ impl App {
             Message::Applied(result) => return self.finish_apply(result),
             Message::Keep => self.keep(),
             Message::Revert => return self.start_revert(),
-            Message::Reverted(result) => {
-                self.busy = None;
-                self.status = match result {
-                    Ok(()) => "Reverted to the previous configuration.".to_owned(),
-                    Err(error) => format!("Could not revert: {error}"),
-                };
-                return self.reload_task();
-            }
+            Message::Reverted(result) => return self.finish_revert(result),
+            Message::CloseRequested | Message::Signal => return self.close(),
             Message::Tick => {
                 if let Some(pending) = &mut self.pending {
                     pending.remaining = pending.remaining.saturating_sub(1);
@@ -714,7 +725,7 @@ impl App {
             return Task::none();
         }
         normalize(&mut self.draft);
-        self.busy = Some("Applying");
+        self.busy = Some(APPLYING);
         self.status.clear();
         if self.options.demo {
             return Task::done(Message::Applied(Ok(())));
@@ -736,12 +747,17 @@ impl App {
                     remaining: REVERT_SECONDS,
                 });
                 self.applied = self.draft.clone();
+                if self.closing {
+                    // Closed while applying: nobody can confirm this now.
+                    return self.start_revert();
+                }
                 if self.options.demo {
                     Task::none()
                 } else {
                     self.reload_task()
                 }
             }
+            Err(_) if self.closing => iced::exit(),
             Err(error) => {
                 self.status = format!("Not applied: {error}");
                 Task::none()
@@ -818,12 +834,49 @@ impl App {
         self.reload_task()
     }
 
+    fn finish_revert(&mut self, result: Result<(), String>) -> Task<Message> {
+        self.busy = None;
+        if self.closing {
+            if result.is_ok() {
+                return iced::exit();
+            }
+            // Closing now would leave the unconfirmed change on screen;
+            // stay open and say so.
+            self.closing = false;
+        }
+        self.status = match result {
+            Ok(()) => "Reverted to the previous configuration.".to_owned(),
+            Err(error) => format!("Could not revert: {error}"),
+        };
+        self.reload_task()
+    }
+
+    /// Closes the editor, first restoring the previous configuration when a
+    /// change is unconfirmed or still being applied (VNR-SRS-005). Further
+    /// close requests and signals wait for that; only a third signal ends
+    /// the editor without it ([`crate::signals`]).
+    fn close(&mut self) -> Task<Message> {
+        if self.closing {
+            return Task::none();
+        }
+        self.closing = true;
+        if self.pending.is_some() {
+            "Restoring the previous configuration before closing.".clone_into(&mut self.status);
+            return self.start_revert();
+        }
+        if matches!(self.busy, Some(APPLYING | REVERTING)) {
+            "Closing once the display server answers.".clone_into(&mut self.status);
+            return Task::none();
+        }
+        iced::exit()
+    }
+
     fn start_revert(&mut self) -> Task<Message> {
         let Some(pending) = self.pending.take() else {
             return Task::none();
         };
         self.draft = pending.previous.clone();
-        self.busy = Some("Reverting");
+        self.busy = Some(REVERTING);
         if self.options.demo {
             self.applied = pending.previous;
             self.edited();
@@ -1298,6 +1351,81 @@ mod tests {
         let _ = app.update(Message::Reverted(Ok(())));
         assert!(app.pending.is_none());
         assert_eq!(app.applied, original);
+    }
+
+    /// Applies a nudge in the demo, leaving it pending.
+    fn pending_app() -> (App, Layout) {
+        let mut app = demo_app();
+        let original = app.applied.clone();
+        let _ = app.update(Message::Select(1));
+        let _ = app.key(KeyCommand::Nudge(0, 10));
+        let _ = app.update(Message::Apply);
+        let _ = app.update(Message::Applied(Ok(())));
+        assert!(app.pending.is_some());
+        (app, original)
+    }
+
+    #[test]
+    fn closing_with_a_pending_change_restores_it_first() {
+        for message in [Message::CloseRequested, Message::Signal] {
+            let (mut app, original) = pending_app();
+            let _ = app.update(message);
+            assert!(app.closing);
+            assert!(app.pending.is_none());
+            assert_eq!(app.busy, Some(REVERTING));
+            assert_eq!(app.draft, original);
+            let _ = app.update(Message::Reverted(Ok(())));
+            assert_eq!(app.applied, original);
+        }
+    }
+
+    #[test]
+    fn closing_while_applying_reverts_when_the_apply_lands() {
+        let mut app = demo_app();
+        let original = app.applied.clone();
+        let _ = app.update(Message::Select(1));
+        let _ = app.key(KeyCommand::Nudge(0, 10));
+        // In the demo `Apply` answers through a task; simulate the wait.
+        let _ = app.update(Message::Apply);
+        assert_eq!(app.busy, Some(APPLYING));
+        let _ = app.update(Message::CloseRequested);
+        assert!(app.closing && app.pending.is_none());
+        let _ = app.update(Message::Applied(Ok(())));
+        assert!(app.pending.is_none());
+        assert_eq!(app.busy, Some(REVERTING));
+        let _ = app.update(Message::Reverted(Ok(())));
+        assert_eq!(app.applied, original);
+    }
+
+    #[test]
+    fn a_second_signal_does_not_skip_the_restore() {
+        let (mut app, original) = pending_app();
+        let _ = app.update(Message::Signal);
+        let _ = app.update(Message::Signal);
+        assert_eq!(app.busy, Some(REVERTING));
+        let _ = app.update(Message::Reverted(Ok(())));
+        assert_eq!(app.applied, original);
+    }
+
+    #[test]
+    fn a_failed_restore_keeps_the_editor_open() {
+        let (mut app, _) = pending_app();
+        let _ = app.update(Message::CloseRequested);
+        let _ = app.update(Message::Reverted(Err("gone".into())));
+        assert!(!app.closing);
+        assert!(
+            app.status.contains("Could not revert: gone"),
+            "{}",
+            app.status
+        );
+    }
+
+    #[test]
+    fn closing_with_nothing_pending_closes_at_once() {
+        let mut app = demo_app();
+        let _ = app.update(Message::CloseRequested);
+        assert!(app.closing);
+        assert_eq!(app.busy, None);
     }
 
     #[test]

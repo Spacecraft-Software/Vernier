@@ -4609,6 +4609,7 @@ dependencies = [
  "iced",
  "serde",
  "serde_json",
+ "signal-hook",
  "smithay-client-toolkit 0.20.0",
  "tempfile",
  "tiny-skia",
