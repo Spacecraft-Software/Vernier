@@ -213,6 +213,13 @@ from 15 seconds with @samp{Keep} and @samp{Revert} buttons.  Keep
 confirms the change; Revert, or letting the countdown reach zero,
 restores the layout from before Apply.
 
+Closing the window while the countdown runs also restores the layout
+from before Apply, and then closes the editor; so do @kbd{Ctrl-C} in
+the terminal that started it, @command{kill}, and closing that
+terminal.  If the layout cannot be restored, the editor stays open and
+says why.  A second @kbd{Ctrl-C} is ignored; only a third ends the
+editor at once, without waiting for the restore.
+
 @cindex save for niri
 On wlroots compositors such as niri, a change lasts until the compositor
 restarts.  The @samp{Save for niri} button writes the applied layout to
