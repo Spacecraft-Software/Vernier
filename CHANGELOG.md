@@ -6,6 +6,12 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 
 ### Fixed
 
+- Closing the editor while a change awaits confirmation, or a SIGINT,
+  SIGTERM or SIGHUP to it, restores the previous configuration before the
+  editor exits; closing during an apply waits for it and then restores.
+  Before, the unconfirmed change stayed on screen (VNR-SRS-005). If the
+  restore fails, the editor stays open with the error. As on the command
+  line, a second signal is ignored and a third ends the editor at once.
 - Ctrl-C on the keep prompt, or SIGTERM or SIGHUP (a closed terminal),
   restores the previous configuration and exits 14, `REVERTED`. Before, it
   ended `vnr` and left the unconfirmed change on screen (VNR-SRS-005). A

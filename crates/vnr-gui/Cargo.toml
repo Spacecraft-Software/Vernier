@@ -17,6 +17,7 @@ categories.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+signal-hook.workspace = true
 iced = { workspace = true, features = ["image-without-codecs"] }
 serde.workspace = true
 vnr-theme.workspace = true

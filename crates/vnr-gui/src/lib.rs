@@ -8,7 +8,8 @@
 //! mirroring, adaptive sync and the primary output in the side panel.
 //! Applying asks for confirmation and reverts after fifteen seconds
 //! without an answer, so a configuration that blanks every screen fixes
-//! itself.
+//! itself. Closing the window, or a signal, reverts an unconfirmed change
+//! before the editor exits.
 //!
 //! Component system (Steelbore Standard §13): Material Design, as iced is
 //! custom-drawn, themed through the named `Steelbore` theme (§11.1).
@@ -24,6 +25,7 @@ mod arrangement;
 mod libs;
 mod overlay;
 pub mod preview;
+mod signals;
 pub mod theme;
 
 use iced::{Font, Size};
@@ -68,6 +70,8 @@ pub fn run(options: Options) -> anyhow::Result<()> {
     .title(app::App::title)
     .theme(app::App::theme)
     .subscription(app::App::subscription)
+    // The editor closes itself, after restoring any unconfirmed change.
+    .exit_on_close_request(false)
     .default_font(BODY_FONT)
     .window_size(Size::new(1100.0, 680.0))
     .run()
