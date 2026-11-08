@@ -97,6 +97,11 @@ pub struct Global {
     #[schemars(skip)]
     pub backend: Option<BackendKind>,
 
+    /// Force terminal protocols on (+name) or off (-name), comma-separated; beats `SPACECRAFT_TERM_PROTOCOLS`. Names: keyboard, graphics, animation, clipboard, clipboard-rich, progress, pointer, all.
+    #[arg(long, global = true, value_name = "[+|-]NAME,...", allow_hyphen_values = true, value_parser = crate::term::Overrides::parse)]
+    #[schemars(skip)]
+    pub term_protocols: Option<crate::term::Overrides>,
+
     /// Print the version, maintainer and project page.
     #[arg(short = 'V', long, global = true)]
     #[schemars(skip)]

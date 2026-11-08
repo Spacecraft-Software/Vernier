@@ -300,6 +300,8 @@ pub struct Out {
     pub palette: Option<vnr_theme::Steelbore>,
     /// Adds maintainer and website to the metadata (`--version`).
     pub contact: bool,
+    /// Which terminal protocols may be sent to stderr.
+    pub terminal: crate::term::Resolved,
 }
 
 /// Writes a 24-bit foreground color escape.

@@ -33,6 +33,7 @@ use crate::records::{
     OutputRecord, VersionRecord, WriteReport, diff,
 };
 use crate::spec;
+use crate::term::Progress;
 use crate::validate::Roots;
 
 /// Runs one parsed command.
@@ -659,10 +660,17 @@ fn save_on_server(
         "the display server is asking on screen whether to keep this configuration; answer Keep within 20 seconds to save it",
         None,
     );
-    match backend
-        .apply_and_save(desired)
-        .map_err(|e| AppError::backend(&e))?
-    {
+    // A spinner in the terminal's tab while GNOME's dialog is up. A signal
+    // only removes it: GNOME restores the old configuration itself when the
+    // dialog goes unanswered.
+    let mut progress = Progress::new(out.terminal.progress);
+    if out.terminal.progress {
+        crate::term::on_signal(|_| false);
+    }
+    progress.busy();
+    let saved = backend.apply_and_save(desired);
+    drop(progress);
+    match saved.map_err(|e| AppError::backend(&e))? {
         Saved::Kept => {
             out.diag(
                 Severity::Ok,
@@ -857,13 +865,15 @@ const KEEP_LEAD: &str = "keep this configuration? [y/N] (reverting in ";
 ///
 /// The seconds count down in place where the terminal can move the cursor,
 /// except in accessible mode, where a screen reader would re-read the line
-/// every second.
+/// every second. Where the terminal draws OSC 9;4, its tab or taskbar also
+/// fills up as the deadline nears, in accessible mode too.
 fn confirm_keep(out: &Out, timeout: Duration) -> bool {
     let seconds = timeout.as_secs();
     let width = seconds.to_string().len();
     let animate = io::stderr().is_terminal()
         && !out.env.term_dumb()
         && !vnr_theme::resolve(&vnr_theme::Request::default()).accessible;
+    let mut progress = Progress::new(out.terminal.progress);
     let mut stderr = io::stderr().lock();
     let _ = write!(
         stderr,
@@ -872,6 +882,12 @@ fn confirm_keep(out: &Out, timeout: Duration) -> bool {
     );
     let _ = stderr.flush();
     drop(stderr);
+    if out.terminal.progress {
+        // A signal still ends `vnr`, but first removes the indicator; the
+        // handler is in place before anything is shown.
+        crate::term::on_signal(|_| false);
+    }
+    progress.percent(0);
 
     let (sender, receiver) = mpsc::channel();
     // Reading stdin has no timeout of its own, so it runs on a detached
@@ -885,13 +901,14 @@ fn confirm_keep(out: &Out, timeout: Duration) -> bool {
 
     let column = KEEP_TAG.chars().count() + 1 + KEEP_LEAD.chars().count();
     let deadline = Instant::now() + timeout;
+    let tick = animate || out.terminal.progress;
     let mut shown = seconds;
     loop {
         let left = deadline.saturating_duration_since(Instant::now());
         if left.is_zero() {
             break;
         }
-        let wait = if animate {
+        let wait = if tick {
             left.min(Duration::from_secs(1))
         } else {
             left
@@ -906,7 +923,9 @@ fn confirm_keep(out: &Out, timeout: Duration) -> bool {
             }
             Ok(Err(_)) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                let now = whole_seconds(deadline.saturating_duration_since(Instant::now()));
+                let left = deadline.saturating_duration_since(Instant::now());
+                progress.percent(elapsed_percent(left, timeout));
+                let now = whole_seconds(left);
                 if animate && now != shown {
                     shown = now;
                     let mut stderr = io::stderr().lock();
@@ -918,6 +937,13 @@ fn confirm_keep(out: &Out, timeout: Duration) -> bool {
     }
     let _ = writeln!(io::stderr());
     false
+}
+
+/// How much of `timeout` has passed, in whole percent.
+fn elapsed_percent(left: Duration, timeout: Duration) -> u8 {
+    let total = timeout.as_millis().max(1);
+    let done = total.saturating_sub(left.as_millis());
+    u8::try_from(done * 100 / total).unwrap_or(100)
 }
 
 /// Seconds left, rounded to the nearest whole second.
@@ -1068,7 +1094,15 @@ fn schema(out: &Out, args: &SchemaArgs) -> Result<(), AppError> {
 }
 
 fn describe(out: &Out) -> Result<(), AppError> {
-    print_document(out, &spec::manifest())
+    let mut manifest = spec::manifest();
+    manifest["terminal_protocols"] = serde_json::to_value(out.terminal.states()).map_err(|e| {
+        AppError::new(
+            ErrorCode::InternalError,
+            e.to_string(),
+            "vnr --verbose describe",
+        )
+    })?;
+    print_document(out, &manifest)
 }
 
 /// `schema` and `describe` print their document bare (no envelope): a
@@ -1262,6 +1296,11 @@ mod tests {
     #[test]
     fn countdown_rewrites_only_the_number() {
         assert_eq!(countdown(52, 2, 9), "\x1b7\r\x1b[52C 9\x1b8");
+        let t = Duration::from_secs(15);
+        assert_eq!(elapsed_percent(t, t), 0);
+        assert_eq!(elapsed_percent(Duration::from_millis(7500), t), 50);
+        assert_eq!(elapsed_percent(Duration::ZERO, t), 100);
+        assert_eq!(elapsed_percent(Duration::ZERO, Duration::ZERO), 100);
         assert_eq!(whole_seconds(Duration::from_millis(13_600)), 14);
         assert_eq!(whole_seconds(Duration::from_millis(13_400)), 13);
         assert_eq!(whole_seconds(Duration::ZERO), 0);

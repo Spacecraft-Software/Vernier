@@ -69,6 +69,7 @@ impl Sandbox {
             "VNR_ALLOWED_PATHS",
             "SPACECRAFT_THEME",
             "SPACECRAFT_A11Y",
+            "SPACECRAFT_TERM_PROTOCOLS",
             "WAYLAND_DISPLAY",
             "DBUS_SESSION_BUS_ADDRESS",
             "DISPLAY",
@@ -828,6 +829,84 @@ fn describe_lists_commands_and_flags() {
             "missing --{flag}"
         );
     }
+}
+
+#[test]
+fn terminal_protocols_are_reported_and_never_sent_to_a_pipe() {
+    let sandbox = Sandbox::new();
+    let manifest = sandbox.run(&["describe"]).json();
+    let states = manifest["terminal_protocols"].as_array().unwrap();
+    assert_eq!(states.len(), 7);
+    let progress = states.iter().find(|s| s["name"] == "progress").unwrap();
+    assert_eq!(progress["enabled"], false);
+    assert_eq!(progress["reason"], "stderr is not a terminal");
+
+    // A terminal that draws OSC 9;4, forced on, and still nothing is sent:
+    // stderr is a pipe here.
+    let out = Outcome::from(
+        sandbox
+            .vnr()
+            .env("TERM", "xterm-256color")
+            .env("TERM_PROGRAM", "WezTerm")
+            .env("TERM_PROGRAM_VERSION", "20250815-120000-abcdef12")
+            .args(["--term-protocols=+all", "--yes", "output", "set", "DP-1"])
+            .args(["--scale", "1.5"])
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(out.code, 0, "{}", out.stderr);
+    assert!(!out.stdout.contains('\x1b') && !out.stderr.contains('\x1b'));
+
+    // A list starting with `-` is a value, not a flag.
+    for list in ["-progress", "-all,+progress"] {
+        let off = sandbox.run(&["--term-protocols", list, "describe"]);
+        assert_eq!(off.code, 0, "{list}: {}", off.stderr);
+    }
+
+    let bad = sandbox.run(&["--term-protocols=+sparkles", "describe"]);
+    assert_eq!(bad.code, 2);
+    assert!(
+        bad.error()["message"]
+            .as_str()
+            .unwrap()
+            .contains("`sparkles`")
+    );
+
+    let ignored = Outcome::from(
+        sandbox
+            .vnr()
+            .env("SPACECRAFT_TERM_PROTOCOLS", "-sparkles")
+            .args(["output", "list"])
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(ignored.code, 0);
+    let warning = &ignored.diagnostics()[0];
+    assert_eq!(warning["code"], "TERM_PROTOCOLS_INVALID");
+    let not_utf8 = Outcome::from(
+        sandbox
+            .vnr()
+            .env(
+                "SPACECRAFT_TERM_PROTOCOLS",
+                <std::ffi::OsStr as std::os::unix::ffi::OsStrExt>::from_bytes(b"-progress\xff"),
+            )
+            .args(["output", "list"])
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(not_utf8.code, 0);
+    assert!(
+        not_utf8.diagnostics()[0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("not valid UTF-8")
+    );
+    assert!(
+        warning["hint"]
+            .as_str()
+            .unwrap()
+            .starts_with("env -u SPACECRAFT_TERM_PROTOCOLS vnr")
+    );
 }
 
 #[test]

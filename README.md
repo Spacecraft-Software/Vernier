@@ -88,7 +88,10 @@ when `AI_AGENT`, `AGENT` or `CI` is set, it prints one JSON document
 errors go to stderr, errors as one JSON line with a `hint` holding the command
 to run next. `--format jsonl|yaml|csv`, `--fields` and `--print0` shape the
 output, `--dry-run` previews any change or file write, and `--yes` keeps a
-change or overwrites a file without asking.
+change or overwrites a file without asking. In terminals known to draw it
+(WezTerm nightly, Ghostty, foot, Windows Terminal and others), the keep
+countdown also shows as progress in the tab or taskbar; `--term-protocols`
+or `SPACECRAFT_TERM_PROTOCOLS` (`-progress`, `+progress`) overrides that.
 
 `vnr schema` prints every command's JSON Schema (ready for LLM function
 calling) and `vnr describe` the capability manifest. Exit codes: 0 success,

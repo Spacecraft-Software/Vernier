@@ -1196,6 +1196,9 @@
 (define rust-shlex-2.0.1
   (crate-source "shlex" "2.0.1"
                 "1fjsll1cd7d2bcpdij9kd6w62rpbc7qqzvydvs021vsmr1cxvypq"))
+(define rust-signal-hook-0.4.6
+  (crate-source "signal-hook" "0.4.6"
+                "0x1a06g3wn874zc0z6c09g5z03bb5abs7q3ss6dafb3pzmx49xs9"))
 (define rust-signal-hook-registry-1.4.8
   (crate-source "signal-hook-registry" "1.4.8"
                 "06vc7pmnki6lmxar3z31gkyg9cw7py5x9g7px70gy2hil75nkny4"))
@@ -2052,6 +2055,7 @@
    rust-sha2-0.11.1
    rust-sha3-0.12.0
    rust-shlex-2.0.1
+   rust-signal-hook-0.4.6
    rust-signal-hook-registry-1.4.8
    rust-simd-cesu8-1.2.0
    rust-simdutf8-0.1.5

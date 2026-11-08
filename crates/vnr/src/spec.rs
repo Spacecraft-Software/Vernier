@@ -34,7 +34,7 @@ pub const MAINTAINER: &str = "Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.
 pub const FOOTER: &str = "Project: https://Vernier.SpacecraftSoftware.org/\nMaintained by Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>";
 
 /// Global flags, in the order `describe` lists them.
-pub const GLOBAL_FLAGS: [&str; 15] = [
+pub const GLOBAL_FLAGS: [&str; 16] = [
     "--json",
     "--format",
     "--fields",
@@ -50,10 +50,11 @@ pub const GLOBAL_FLAGS: [&str; 15] = [
     "--yes",
     "--force",
     "--backend",
+    "--term-protocols",
 ];
 
 /// Diagnostic codes `vnr` emits besides errors.
-pub const DIAGNOSTICS: [(&str, &str, &str); 12] = [
+pub const DIAGNOSTICS: [(&str, &str, &str); 13] = [
     ("APPLIED", "ok", "a configuration was applied"),
     (
         "KEPT",
@@ -98,9 +99,14 @@ pub const DIAGNOSTICS: [(&str, &str, &str); 12] = [
         "the explore viewer is not built yet; the table was printed",
     ),
     (
+        "TERM_PROTOCOLS_INVALID",
+        "warn",
+        "SPACECRAFT_TERM_PROTOCOLS could not be read and was ignored",
+    ),
+    (
         "RESOLVED",
         "info",
-        "which backend, theme or allowed paths were chosen",
+        "which backend, theme, allowed paths or terminal protocols were chosen",
     ),
 ];
 
@@ -627,6 +633,7 @@ pub fn manifest() -> Value {
             "VNR_ALLOWED_PATHS": "colon-separated directories added to the path allow-list",
             "SPACECRAFT_THEME": "terminal and editor theme",
             "SPACECRAFT_A11Y": "accessible mode on (1) or off (0)",
+            "SPACECRAFT_TERM_PROTOCOLS": "terminal protocols forced on (+name) or off (-name), as --term-protocols",
         },
         "mcp_available": false,
         "schema_command": "vnr schema",
