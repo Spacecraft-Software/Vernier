@@ -857,6 +857,12 @@ fn terminal_protocols_are_reported_and_never_sent_to_a_pipe() {
     assert_eq!(out.code, 0, "{}", out.stderr);
     assert!(!out.stdout.contains('\x1b') && !out.stderr.contains('\x1b'));
 
+    // A list starting with `-` is a value, not a flag.
+    for list in ["-progress", "-all,+progress"] {
+        let off = sandbox.run(&["--term-protocols", list, "describe"]);
+        assert_eq!(off.code, 0, "{list}: {}", off.stderr);
+    }
+
     let bad = sandbox.run(&["--term-protocols=+sparkles", "describe"]);
     assert_eq!(bad.code, 2);
     assert!(
