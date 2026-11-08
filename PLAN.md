@@ -48,9 +48,9 @@ MVP: M0–M7 — Vernier v1.0
 
 - [x] P-023 `org.gnome.Mutter.DisplayConfig` `GetCurrentState` via `zbus`
 - [x] P-024 `ApplyMonitorsConfig`: verify (as `test`) and temporary; mirroring as shared logical monitors; physical and logical layout modes
-- [ ] P-043 Persistent GNOME changes without GNOME Shell's own confirm dialog doubling Vernier's: implemented (`--save`, Save for GNOME; GNOME's dialog replaces Vernier's prompt; checked on headless Mutter), verify GNOME Shell's dialog with P-045
+- [x] P-043 Persistent GNOME changes without GNOME Shell's own confirm dialog doubling Vernier's: `--save` and Save for GNOME; GNOME's Keep Changes dialog replaces Vernier's prompt; verified on the maintainer's ThinkPad T490s under GNOME 50 on Steelbore OS Bravais, 2026-10-30 to 2026-11-05: Keep saves, Revert exits 14, saved layout returns at login
 - [x] P-044 Run the headless Mutter test (`crates/vnr-mutter/tests/mutter_headless.rs`) in CI
-- [ ] P-045 Verify on real GNOME hardware, including fractional scaling in logical layout mode
+- [x] P-045 Verify on real GNOME hardware, including fractional scaling in logical layout mode: ThinkPad T490s with an HDMI monitor, GNOME 50, 2026-10-29 to 2026-11-05: scale 1.25 and 1.5 (neighbours follow), rotation with revert, primary, mirror and un-mirror, Save for GNOME
 
 ## M5 — Release hardening
 

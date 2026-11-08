@@ -1,14 +1,14 @@
 # SPDX-FileCopyrightText: 2026 Mohamed Hammad <Mohamed.Hammad@SpacecraftSoftware.org>
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Nix package for Vernier. Until the first release is tagged it builds the
-# checkout it sits in; the release switches `src` to the tag's tarball and
+# Nix package for Vernier: builds the v0.1.0 release tarball, checked against
 # its hash. From a flake (e.g. Steelbore OS Bravais):
 #   vernier = pkgs.callPackage ./packaging/default.nix { };
 # or directly:
 #   nix-build -E 'with import <nixpkgs> {}; callPackage ./packaging/default.nix {}'
 {
   lib,
+  fetchurl,
   rustPlatform,
   makeWrapper,
   texinfo,
@@ -22,11 +22,11 @@ rustPlatform.buildRustPackage {
   pname = "vernier";
   version = "0.1.0";
 
-  # Skip local build output so a prior `cargo build` does not bloat the source.
-  src = lib.cleanSourceWith {
-    src = lib.cleanSource ../.;
-    filter = path: type: !(type == "directory" && baseNameOf path == "target");
+  src = fetchurl {
+    url = "https://github.com/Spacecraft-Software/Vernier/releases/download/v0.1.0/vernier-0.1.0.tar.gz";
+    hash = "sha256-03E+BwsFf42hNHuJR1bOJPt2oRwTXYF0ZJZkb2/niJI=";
   };
+  # Must be the Cargo.lock of the tarball above: update both at each release.
   cargoLock.lockFile = ../Cargo.lock;
 
   nativeBuildInputs = [
