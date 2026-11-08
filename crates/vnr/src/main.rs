@@ -16,6 +16,7 @@ mod error;
 mod output;
 mod records;
 mod spec;
+mod term;
 mod time;
 mod validate;
 
@@ -73,6 +74,17 @@ fn run(args: &[String], env: Env) -> u8 {
     let palette = resolved
         .color
         .then(|| vnr_theme::resolve(&vnr_theme::Request::default()).tokens);
+    // The variable is read here, not by clap, so the flag can beat it name
+    // by name instead of replacing it whole.
+    let from_env = std::env::var(term::ENV)
+        .ok()
+        .map(|list| term::Overrides::parse(&list));
+    let overrides = match &from_env {
+        Some(Ok(o)) => *o,
+        _ => term::Overrides::default(),
+    }
+    .then(global.term_protocols.unwrap_or_default());
+    let terminal = term::resolve(&term::Terminal::read(env.is_automated()), overrides);
     let out = Out {
         resolved,
         command: command_line(args),
@@ -82,7 +94,17 @@ fn run(args: &[String], env: Env) -> u8 {
         env,
         palette,
         contact: global.version,
+        terminal,
     };
+    if let Some(Err(problem)) = from_env {
+        out.diag(
+            Severity::Warn,
+            "TERM_PROTOCOLS_INVALID",
+            &format!("{} is ignored: {problem}", term::ENV),
+            Some(&format!("env -u {} {}", term::ENV, out.command)),
+        );
+    }
+    out.diag(Severity::Info, "RESOLVED", &out.terminal.summary(), None);
     if let Some(reason) = out.resolved.explore_fallback {
         out.diag(
             Severity::Warn,
@@ -222,6 +244,8 @@ fn window_failure(payload: &str) -> Option<AppError> {
 /// the caller what happened in the agreed shape (exit 1, `INTERNAL_ERROR`).
 fn install_panic_hook() {
     std::panic::set_hook(Box::new(|info| {
+        // Leave no progress indicator behind in the terminal's tab.
+        term::restore();
         let env = Env::read();
         let args: Vec<String> = std::env::args().collect();
         let location = info

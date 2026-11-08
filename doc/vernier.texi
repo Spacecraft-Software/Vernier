@@ -349,6 +349,30 @@ editor to open under an agent.
 @item --backend @var{name}
 Use this backend instead of detecting one (@pxref{Backends}).
 
+@item --term-protocols @var{list}
+@cindex terminal protocols
+@cindex progress, in the terminal tab
+Force terminal protocols on or off.  @var{list} is comma-separated;
+@samp{+@var{name}} forces a protocol on, @samp{-@var{name}} off, and
+@code{all} stands for every one, so @samp{-all,+progress} turns on only
+progress.  The names are @code{keyboard}, @code{graphics},
+@code{animation}, @code{clipboard}, @code{clipboard-rich},
+@code{progress} and @code{pointer}; this option beats
+@env{SPACECRAFT_TERM_PROTOCOLS}, name by name.
+
+Vernier uses one of them, @code{progress}: while it waits for you to
+keep a change, or for GNOME's own dialog, the terminal's tab or taskbar
+shows how long is left.  It is sent only to terminals known to draw it
+(Windows Terminal, ConEmu, foot, Ghostty, VS Code, Rio, contour, iTerm2
+3.6 or newer, and WezTerm builds from 2025-02-10 on) and never inside
+tmux, zellij or GNU screen, because other terminals show the same
+sequence as a desktop notification.  @samp{+progress} sends it anyway,
+for example to kitty, whose version Vernier cannot read.  Nothing is
+ever sent when stderr is not a terminal, when an agent or CI runs
+Vernier, or when @env{TERM} is @code{dumb} or unset.
+@samp{vnr --verbose} and @samp{vnr describe} show what was decided and
+why.
+
 @item -V
 @itemx --version
 Print the version, maintainer and project page.
@@ -685,6 +709,11 @@ Theme slug, for example @code{steelbore} or
 @item SPACECRAFT_A11Y
 @code{1} turns accessible mode on (high-contrast theme, no animation);
 @code{0} turns it off.
+
+@item SPACECRAFT_TERM_PROTOCOLS
+Terminal protocols to force on or off, in the form of
+@option{--term-protocols} (@pxref{Global Options}).  An unreadable value
+is ignored with a warning.
 
 @item NO_COLOR
 @itemx FORCE_COLOR

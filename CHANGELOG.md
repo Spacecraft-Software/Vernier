@@ -30,6 +30,16 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 
 ### Added
 
+- While `vnr` waits for a change to be kept, terminals known to draw OSC 9;4
+  progress (Windows Terminal, ConEmu, foot, Ghostty, VS Code, Rio, contour,
+  iTerm2 3.6+, WezTerm builds from 2025-02-10 on) show the countdown in the
+  tab or taskbar, and a spinner while GNOME's own dialog is up. Nothing is
+  sent elsewhere, inside a multiplexer, when stderr is not a terminal, or
+  under an agent or CI. `--term-protocols` and `SPACECRAFT_TERM_PROTOCOLS`
+  force protocols on or off (the flag wins, name by name); `vnr describe`
+  lists each protocol's state and `--verbose` says what was decided. The
+  indicator is removed on exit, on panic and on SIGINT, SIGTERM and SIGHUP.
+
 - `--save` on `output set` and `profile apply`, and Save for GNOME in the
   editor: GNOME saves the change for every login after its own Keep Changes
   dialog, which replaces Vernier's prompt; a refusal exits 14, `REVERTED`.

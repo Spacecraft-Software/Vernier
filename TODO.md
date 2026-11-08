@@ -20,6 +20,7 @@ verified by a test or a recorded run.
 - [x] T-014 Theme tokens in `vnr-theme`, shared by CLI colors and the editor
 - [x] T-015 Compliance integration tests covering the CLI Standard test categories
 - [x] T-016 `SKILL.md` at the repository root
+- [x] T-021 Terminal protocols (Spacecraft TUI protocols profile): OSC 9;4 progress on allow-listed terminals during the keep countdown and GNOME's dialog, `--term-protocols` / `SPACECRAFT_TERM_PROTOCOLS`, restore on drop, panic and signal
 - [ ] T-017 `--format explore` terminal table viewer (ratatui), with CUA and Vim keys
 - [ ] T-018 Cross-shell round-trip tests through jaq, Nushell and PowerShell in CI
 - [ ] T-019 `vnr schema` provider wrappers for Anthropic, OpenAI and Gemini (optional)
