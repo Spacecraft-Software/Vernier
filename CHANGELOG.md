@@ -4,6 +4,14 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 
 ## Unreleased
 
+### Fixed
+
+- Ctrl-C on the keep prompt, or SIGTERM or SIGHUP (a closed terminal),
+  restores the previous configuration and exits 14, `REVERTED`. Before, it
+  ended `vnr` and left the unconfirmed change on screen (VNR-SRS-005). A
+  second signal is ignored, so a habitual double Ctrl-C still restores; a
+  third ends `vnr` at once, for a terminal whose output is paused.
+
 ### Added
 
 - While `vnr` waits for a change to be kept, terminals known to draw OSC 9;4
