@@ -11,7 +11,7 @@ use std::fmt::Write as _;
 use std::fs;
 use std::io::{self, BufRead, IsTerminal, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -867,6 +867,10 @@ fn emit_report(out: &Out, report: &ApplyReport) -> Result<(), AppError> {
 const KEEP_TAG: &str = "[WARN]";
 const KEEP_LEAD: &str = "keep this configuration? [y/N] (reverting in ";
 
+/// The signal that ends `vnr` without restoring: the third, so a habitual
+/// double Ctrl-C still restores.
+const SIGNALS_TO_STOP: u32 = 3;
+
 /// How the keep prompt ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Answer {
@@ -910,13 +914,19 @@ fn confirm_keep(out: &Out, timeout: Duration) -> Answer {
     drop(stderr);
     let (sender, receiver) = mpsc::channel();
     let signals = sender.clone();
-    let interrupted = AtomicBool::new(false);
+    let signals_seen = AtomicU32::new(0);
     // In place before anything is shown. The first signal answers the
-    // prompt; a second one, or one after the prompt has ended, does what it
-    // would have done anyway, so `vnr` can still be stopped while the
-    // revert waits on a terminal whose output is paused (Ctrl-S).
+    // prompt "no"; the second is ignored, so pressing Ctrl-C twice out of
+    // habit cannot skip the restore, including one already under way when
+    // the prompt timed out. Only a third does what it would have done
+    // anyway, so `vnr` can still be stopped while the restore waits on a
+    // terminal whose output is paused (Ctrl-S).
     crate::term::on_signal(move |_| {
-        !interrupted.swap(true, Ordering::SeqCst) && signals.send(Event::Signal).is_ok()
+        let seen = signals_seen.fetch_add(1, Ordering::SeqCst) + 1;
+        if seen == 1 {
+            let _ = signals.send(Event::Signal);
+        }
+        seen < SIGNALS_TO_STOP
     });
     progress.percent(0);
 

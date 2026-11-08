@@ -106,8 +106,9 @@ tests it before applying it.  After every interactive change Vernier
 asks whether to keep it, and if nobody answers within 15 seconds it
 restores the previous configuration.  A layout that blanks every screen
 therefore undoes itself.  On the command line, interrupting the question
-with @kbd{Ctrl-C}, or closing the terminal, also restores it; a second
-@kbd{Ctrl-C} ends Vernier at once, without waiting for the restore.
+with @kbd{Ctrl-C}, or closing the terminal, also restores it.  A second
+@kbd{Ctrl-C} is ignored; only a third ends Vernier at once, without
+waiting for the restore.
 
 @cindex protocols
 Vernier speaks each display protocol directly.  It never runs
