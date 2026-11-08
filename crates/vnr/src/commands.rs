@@ -11,6 +11,7 @@ use std::fmt::Write as _;
 use std::fs;
 use std::io::{self, BufRead, IsTerminal, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -796,14 +797,20 @@ fn confirm_or_revert(
     before: &Layout,
     timeout: u64,
 ) -> Result<(), AppError> {
-    if confirm_keep(out, Duration::from_secs(timeout)) {
+    let answer = confirm_keep(out, Duration::from_secs(timeout));
+    if answer == Answer::Keep {
         out.diag(Severity::Ok, "KEPT", "kept the new configuration", None);
         return Ok(());
     }
+    let message = if answer == Answer::Interrupted {
+        "the prompt was interrupted, so the previous configuration was restored"
+    } else {
+        "the change was not confirmed, so the previous configuration was restored"
+    };
     match backend.apply(before) {
         Ok(()) => Err(AppError::new(
             ErrorCode::Reverted,
-            "the change was not confirmed, so the previous configuration was restored",
+            message,
             format!("{} --yes", out.command),
         )),
         Err(e) => Err(AppError::new(
@@ -860,14 +867,33 @@ fn emit_report(out: &Out, report: &ApplyReport) -> Result<(), AppError> {
 const KEEP_TAG: &str = "[WARN]";
 const KEEP_LEAD: &str = "keep this configuration? [y/N] (reverting in ";
 
+/// How the keep prompt ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Answer {
+    /// The person answered `y`.
+    Keep,
+    /// Any other answer, end of input, or silence until the deadline.
+    Declined,
+    /// SIGINT, SIGTERM or SIGHUP arrived.
+    Interrupted,
+}
+
+/// What the stdin and signal threads tell the prompt.
+enum Event {
+    Line(io::Result<String>),
+    Signal,
+}
+
 /// Asks on the terminal whether to keep the change; anything but `y`,
-/// including silence until `timeout`, means no.
+/// including silence until `timeout`, means no. So does a signal: Ctrl-C
+/// on this prompt, or a closed terminal, restores the old configuration
+/// rather than leaving an unconfirmed one on screen.
 ///
 /// The seconds count down in place where the terminal can move the cursor,
 /// except in accessible mode, where a screen reader would re-read the line
 /// every second. Where the terminal draws OSC 9;4, its tab or taskbar also
 /// fills up as the deadline nears, in accessible mode too.
-fn confirm_keep(out: &Out, timeout: Duration) -> bool {
+fn confirm_keep(out: &Out, timeout: Duration) -> Answer {
     let seconds = timeout.as_secs();
     let width = seconds.to_string().len();
     let animate = io::stderr().is_terminal()
@@ -882,21 +908,25 @@ fn confirm_keep(out: &Out, timeout: Duration) -> bool {
     );
     let _ = stderr.flush();
     drop(stderr);
-    if out.terminal.progress {
-        // A signal still ends `vnr`, but first removes the indicator; the
-        // handler is in place before anything is shown.
-        crate::term::on_signal(|_| false);
-    }
+    let (sender, receiver) = mpsc::channel();
+    let signals = sender.clone();
+    let interrupted = AtomicBool::new(false);
+    // In place before anything is shown. The first signal answers the
+    // prompt; a second one, or one after the prompt has ended, does what it
+    // would have done anyway, so `vnr` can still be stopped while the
+    // revert waits on a terminal whose output is paused (Ctrl-S).
+    crate::term::on_signal(move |_| {
+        !interrupted.swap(true, Ordering::SeqCst) && signals.send(Event::Signal).is_ok()
+    });
     progress.percent(0);
 
-    let (sender, receiver) = mpsc::channel();
     // Reading stdin has no timeout of its own, so it runs on a detached
     // thread; if the deadline passes the process exits with the thread
     // still waiting, which is harmless.
     thread::spawn(move || {
         let mut line = String::new();
         let answer = io::stdin().lock().read_line(&mut line).map(|_| line);
-        let _ = sender.send(answer);
+        let _ = sender.send(Event::Line(answer));
     });
 
     let column = KEEP_TAG.chars().count() + 1 + KEEP_LEAD.chars().count();
@@ -914,14 +944,22 @@ fn confirm_keep(out: &Out, timeout: Duration) -> bool {
             left
         };
         match receiver.recv_timeout(wait) {
-            Ok(Ok(line)) => {
+            Ok(Event::Line(Ok(line))) => {
                 // End of input (Ctrl-D) echoes no newline; Enter does.
                 if line.is_empty() {
                     let _ = writeln!(io::stderr());
                 }
-                return matches!(line.trim(), "y" | "Y" | "yes" | "Yes" | "YES");
+                return if matches!(line.trim(), "y" | "Y" | "yes" | "Yes" | "YES") {
+                    Answer::Keep
+                } else {
+                    Answer::Declined
+                };
             }
-            Ok(Err(_)) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            Ok(Event::Signal) => {
+                let _ = writeln!(io::stderr());
+                return Answer::Interrupted;
+            }
+            Ok(Event::Line(Err(_))) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 let left = deadline.saturating_duration_since(Instant::now());
                 progress.percent(elapsed_percent(left, timeout));
@@ -936,7 +974,7 @@ fn confirm_keep(out: &Out, timeout: Duration) -> bool {
         }
     }
     let _ = writeln!(io::stderr());
-    false
+    Answer::Declined
 }
 
 /// How much of `timeout` has passed, in whole percent.

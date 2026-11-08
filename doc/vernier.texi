@@ -105,7 +105,9 @@ screen.  Where the display server can test a configuration, Vernier
 tests it before applying it.  After every interactive change Vernier
 asks whether to keep it, and if nobody answers within 15 seconds it
 restores the previous configuration.  A layout that blanks every screen
-therefore undoes itself.
+therefore undoes itself.  On the command line, interrupting the question
+with @kbd{Ctrl-C}, or closing the terminal, also restores it; a second
+@kbd{Ctrl-C} ends Vernier at once, without waiting for the restore.
 
 @cindex protocols
 Vernier speaks each display protocol directly.  It never runs
@@ -748,7 +750,7 @@ you can run.
 @item 11 @tab @code{UNSUPPORTED} @tab The backend cannot express the change.
 @item 12 @tab @code{REJECTED} @tab The display server refused the configuration.
 @item 13 @tab @code{PROTOCOL_ERROR} @tab The display server sent something unexpected.
-@item 14 @tab @code{REVERTED} @tab The change was not confirmed and was undone.
+@item 14 @tab @code{REVERTED} @tab The change was not confirmed, or the prompt was interrupted, and was undone.
 @item 15 @tab @code{INVALID_LAYOUT} @tab The layout has errors and was not sent.
 @item 16 @tab @code{REVERT_FAILED} @tab Restoring the previous configuration failed.
 @item 17 @tab @code{LIBRARY_MISSING} @tab The editor cannot load a library it needs.
