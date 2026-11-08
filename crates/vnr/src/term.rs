@@ -428,14 +428,15 @@ fn clear() {
     }
 }
 
-/// [`restore`], waiting at most [`RESTORE_WAIT`] for the terminal.
-fn restore_briefly() {
+/// Starts [`restore`] on a thread of its own and returns what to wait on
+/// for it, so the signal thread never blocks on a paused terminal.
+fn start_restore() -> mpsc::Receiver<()> {
     let (done, finished) = mpsc::channel();
     thread::spawn(move || {
         restore();
         let _ = done.send(());
     });
-    let _ = finished.recv_timeout(RESTORE_WAIT);
+    finished
 }
 
 /// An OSC 9;4 indicator in the terminal's tab or taskbar, removed on drop.
@@ -496,9 +497,14 @@ pub fn on_signal(handled: impl Fn(i32) -> bool + Send + 'static) {
         return;
     };
     thread::spawn(move || {
+        // The signal thread never waits before handing a signal on: a
+        // signal arriving while it waited would be merged with the next.
+        let mut restoring = None;
         for signal in signals.forever() {
-            restore_briefly();
+            let finished = restoring.get_or_insert_with(start_restore);
             if !handled(signal) {
+                // Give the indicator a moment to go, but end regardless.
+                let _ = finished.recv_timeout(RESTORE_WAIT);
                 let _ = signal_hook::low_level::emulate_default_handler(signal);
                 // The default for these three ends the process; were it
                 // ignored, end it the way a shell reports a signal.
