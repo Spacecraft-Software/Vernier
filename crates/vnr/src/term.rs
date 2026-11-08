@@ -27,7 +27,9 @@
 use std::env;
 use std::io::{self, IsTerminal, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::thread;
+use std::time::Duration;
 
 use serde::Serialize;
 use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
@@ -191,12 +193,19 @@ pub struct Terminal {
     pub windows: bool,
     /// `ConEmuPID` is set or `ConEmuANSI` is `ON`: `ConEmu`.
     pub conemu: bool,
-    /// `TMUX`, `ZELLIJ` or `STY` is set: a multiplexer sits in between.
+    /// `TMUX`, `ZELLIJ` or `STY` is set, or `TERM` starts with `tmux` or
+    /// `screen`: a multiplexer sits in between.
     pub multiplexer: bool,
 }
 
 fn var(name: &str) -> Option<String> {
     env::var(name).ok().filter(|v| !v.is_empty())
+}
+
+/// Whether `TERM` names tmux or GNU screen, for wrappers that drop `TMUX`
+/// or `STY` but keep the multiplexer's `TERM`.
+fn multiplexer_term(term: Option<&str>) -> bool {
+    term.is_some_and(|t| t.starts_with("tmux") || t.starts_with("screen"))
 }
 
 impl Terminal {
@@ -212,7 +221,8 @@ impl Terminal {
             version: var("TERM_PROGRAM_VERSION"),
             windows: var("WT_SESSION").is_some(),
             conemu: var("ConEmuPID").is_some() || var("ConEmuANSI").as_deref() == Some("ON"),
-            multiplexer: ["TMUX", "ZELLIJ", "STY"].iter().any(|n| var(n).is_some()),
+            multiplexer: ["TMUX", "ZELLIJ", "STY"].iter().any(|n| var(n).is_some())
+                || multiplexer_term(var("TERM").as_deref()),
         }
     }
 
@@ -377,19 +387,55 @@ const CLEAR: &[u8] = b"\x1b]9;4;0;0\x1b\\";
 /// Set while an indicator is shown, so [`restore`] knows to remove it.
 static SHOWN: AtomicBool = AtomicBool::new(false);
 
-fn send(sequence: &[u8]) {
+/// Set by [`restore`]: the process is ending, so nothing more is shown.
+static CLOSED: AtomicBool = AtomicBool::new(false);
+
+/// How long a signal waits for [`restore`] before ending the process
+/// anyway, in case output to the terminal is stopped (Ctrl-S).
+const RESTORE_WAIT: Duration = Duration::from_millis(200);
+
+/// Writes a progress update unless [`restore`] has run. Both hold the
+/// stderr lock while deciding, so no update can follow the final clear.
+fn show(sequence: &[u8]) {
     let mut stderr = io::stderr().lock();
+    if CLOSED.load(Ordering::SeqCst) {
+        return;
+    }
+    SHOWN.store(true, Ordering::SeqCst);
     let _ = stderr.write_all(sequence);
     let _ = stderr.flush();
 }
 
-/// Removes a progress indicator left by a [`Progress`] that could not drop:
-/// the panic hook and the signal thread call this. A second call does
-/// nothing.
+/// Removes a progress indicator left by a [`Progress`] that could not drop,
+/// and stops any further update: the panic hook and the signal thread call
+/// this. A second call does nothing.
 pub fn restore() {
+    let mut stderr = io::stderr().lock();
+    CLOSED.store(true, Ordering::SeqCst);
     if SHOWN.swap(false, Ordering::SeqCst) {
-        send(CLEAR);
+        let _ = stderr.write_all(CLEAR);
+        let _ = stderr.flush();
     }
+}
+
+/// Removes the indicator when the [`Progress`] showing it is done; later
+/// updates may show a new one.
+fn clear() {
+    let mut stderr = io::stderr().lock();
+    if SHOWN.swap(false, Ordering::SeqCst) {
+        let _ = stderr.write_all(CLEAR);
+        let _ = stderr.flush();
+    }
+}
+
+/// [`restore`], waiting at most [`RESTORE_WAIT`] for the terminal.
+fn restore_briefly() {
+    let (done, finished) = mpsc::channel();
+    thread::spawn(move || {
+        restore();
+        let _ = done.send(());
+    });
+    let _ = finished.recv_timeout(RESTORE_WAIT);
 }
 
 /// An OSC 9;4 indicator in the terminal's tab or taskbar, removed on drop.
@@ -416,8 +462,7 @@ impl Progress {
         let percent = percent.min(100);
         if self.enabled && self.last != Some(percent) {
             self.last = Some(percent);
-            SHOWN.store(true, Ordering::SeqCst);
-            send(format!("\x1b]9;4;1;{percent}\x1b\\").as_bytes());
+            show(format!("\x1b]9;4;1;{percent}\x1b\\").as_bytes());
         }
     }
 
@@ -426,8 +471,7 @@ impl Progress {
         if self.enabled {
             // Never equal to a percentage, so a later `percent` is sent.
             self.last = Some(u8::MAX);
-            SHOWN.store(true, Ordering::SeqCst);
-            send(b"\x1b]9;4;3;0\x1b\\");
+            show(b"\x1b]9;4;3;0\x1b\\");
         }
     }
 }
@@ -435,7 +479,7 @@ impl Progress {
 impl Drop for Progress {
     fn drop(&mut self) {
         if self.enabled {
-            restore();
+            clear();
         }
     }
 }
@@ -453,7 +497,7 @@ pub fn on_signal(handled: impl Fn(i32) -> bool + Send + 'static) {
     };
     thread::spawn(move || {
         for signal in signals.forever() {
-            restore();
+            restore_briefly();
             if !handled(signal) {
                 let _ = signal_hook::low_level::emulate_default_handler(signal);
                 // The default for these three ends the process; were it
@@ -568,6 +612,11 @@ mod tests {
         };
         assert!(!progress(&tmux, ""));
         assert!(progress(&tmux, "+progress"));
+        for term in ["tmux-256color", "screen", "screen.xterm-256color"] {
+            assert!(multiplexer_term(Some(term)), "{term}");
+        }
+        assert!(!multiplexer_term(Some("xterm-256color")));
+        assert!(!multiplexer_term(None));
         assert!(!progress(&tty("ghostty", ""), "-progress"));
     }
 

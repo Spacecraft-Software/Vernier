@@ -76,9 +76,11 @@ fn run(args: &[String], env: Env) -> u8 {
         .then(|| vnr_theme::resolve(&vnr_theme::Request::default()).tokens);
     // The variable is read here, not by clap, so the flag can beat it name
     // by name instead of replacing it whole.
-    let from_env = std::env::var(term::ENV)
-        .ok()
-        .map(|list| term::Overrides::parse(&list));
+    let from_env = match std::env::var(term::ENV) {
+        Ok(list) => Some(term::Overrides::parse(&list)),
+        Err(std::env::VarError::NotPresent) => None,
+        Err(std::env::VarError::NotUnicode(_)) => Some(Err("it is not valid UTF-8".to_owned())),
+    };
     let overrides = match &from_env {
         Some(Ok(o)) => *o,
         _ => term::Overrides::default(),

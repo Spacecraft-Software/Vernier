@@ -883,6 +883,24 @@ fn terminal_protocols_are_reported_and_never_sent_to_a_pipe() {
     assert_eq!(ignored.code, 0);
     let warning = &ignored.diagnostics()[0];
     assert_eq!(warning["code"], "TERM_PROTOCOLS_INVALID");
+    let not_utf8 = Outcome::from(
+        sandbox
+            .vnr()
+            .env(
+                "SPACECRAFT_TERM_PROTOCOLS",
+                <std::ffi::OsStr as std::os::unix::ffi::OsStrExt>::from_bytes(b"-progress\xff"),
+            )
+            .args(["output", "list"])
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(not_utf8.code, 0);
+    assert!(
+        not_utf8.diagnostics()[0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("not valid UTF-8")
+    );
     assert!(
         warning["hint"]
             .as_str()

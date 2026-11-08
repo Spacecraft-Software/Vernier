@@ -882,12 +882,13 @@ fn confirm_keep(out: &Out, timeout: Duration) -> bool {
     );
     let _ = stderr.flush();
     drop(stderr);
-    progress.percent(0);
-
     if out.terminal.progress {
-        // A signal still ends `vnr`, but first removes the indicator.
+        // A signal still ends `vnr`, but first removes the indicator; the
+        // handler is in place before anything is shown.
         crate::term::on_signal(|_| false);
     }
+    progress.percent(0);
+
     let (sender, receiver) = mpsc::channel();
     // Reading stdin has no timeout of its own, so it runs on a detached
     // thread; if the deadline passes the process exits with the thread

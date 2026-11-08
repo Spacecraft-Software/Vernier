@@ -360,9 +360,10 @@ progress.  The names are @code{keyboard}, @code{graphics},
 @code{progress} and @code{pointer}; this option beats
 @env{SPACECRAFT_TERM_PROTOCOLS}, name by name.
 
-Vernier uses one of them, @code{progress}: while it waits for you to
-keep a change, or for GNOME's own dialog, the terminal's tab or taskbar
-shows how long is left.  It is sent only to terminals known to draw it
+Vernier uses one of them, @code{progress}.  While it waits for you to
+keep a change, the terminal's tab or taskbar fills up as the deadline
+nears; while GNOME's own dialog is up (@option{--save}), it shows a busy
+indicator instead, because GNOME does not say how long is left.  It is sent only to terminals known to draw it
 (Windows Terminal, ConEmu, foot, Ghostty, VS Code, Rio, contour, iTerm2
 3.6 or newer, and WezTerm builds from 2025-02-10 on) and never inside
 tmux, zellij or GNU screen, because other terminals show the same
