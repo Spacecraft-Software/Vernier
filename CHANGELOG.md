@@ -14,6 +14,9 @@ All notable changes to Vernier are recorded here. Dates are UTC, ISO 8601.
 
 ### Fixed
 
+- Ctrl-C on the keep prompt, or SIGTERM or SIGHUP (a closed terminal),
+  restores the previous configuration and exits 14, `REVERTED`. Before, it
+  ended `vnr` and left the unconfirmed change on screen (VNR-SRS-005).
 - `output set --no-mirror` places the output beside the screen it mirrored.
   It used to stay on top of it, and Mutter refused the overlap.
 - Changing an output's scale, mode or rotation (`output set`, and the
